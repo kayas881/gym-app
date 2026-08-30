@@ -11,6 +11,7 @@ import {
   View,
 } from 'react-native';
 import { useRouter, Link } from 'expo-router';
+import * as Linking from 'expo-linking';
 import { useOAuth } from '@clerk/expo';
 import { useSignIn } from '@clerk/expo/legacy';
 import { Ionicons } from '@expo/vector-icons';
@@ -177,7 +178,12 @@ export default function SignInScreen() {
       setErrorMessage('');
       setGoogleLoading(true);
 
-      const { createdSessionId, setActive: setOAuthActive } = await startOAuthFlow();
+      // Send the OAuth redirect to a route that actually exists. Without an
+      // explicit redirectUrl, Clerk returns to a path expo-router has no screen
+      // for, which flashed "Unmatched Route" before the session resolved.
+      const { createdSessionId, setActive: setOAuthActive } = await startOAuthFlow({
+        redirectUrl: Linking.createURL('/'),
+      });
 
       if (createdSessionId && setOAuthActive) {
         await setOAuthActive({ session: createdSessionId });

@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "565012499853",
+    "project_id": "gym-app-8ad90",
+    "storage_bucket": "gym-app-8ad90.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:565012499853:android:8a0c89d166408f5b9f41c4",
+        "android_client_info": {
+          "package_name": "com.kayas.mygymapp"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCmJ6iq9azOcNlzSZTR6w2kIa7R1j1k2ao"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
