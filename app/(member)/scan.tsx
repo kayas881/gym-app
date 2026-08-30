@@ -1,0 +1,607 @@
+import React, { useState, useEffect, useRef } from 'react';
+import {
+  View,
+  Text,
+  TouchableOpacity,
+  Alert,
+  StyleSheet,
+  ActivityIndicator,
+  Animated,
+  Platform,
+} from 'react-native';
+import { useRouter } from 'expo-router';
+import { Ionicons } from '@expo/vector-icons';
+import { CameraView, useCameraPermissions, BarcodeScanningResult } from 'expo-camera';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useAppAuth } from '../../lib/auth';
+import { useTheme } from '../../lib/theme';
+import { useCheckIns } from '../../hooks/useCheckIns';
+import Button from '../../components/ui/Button';
+import Input from '../../components/ui/Input';
+import Card from '../../components/ui/Card';
+
+export default function MemberScanScreen() {
+  const router = useRouter();
+  const insets = useSafeAreaInsets();
+  const { gymId, currentMembership } = useAppAuth();
+  const { colors, isDark } = useTheme();
+
+  const {
+    hasCheckedInToday,
+    checkIn,
+    loading: checkInLoading,
+  } = useCheckIns(currentMembership?.id);
+
+  const [permission, requestPermission] = useCameraPermissions();
+  const [scanned, setScanned] = useState(false);
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [manualCode, setManualCode] = useState('');
+  const [showManualInput, setShowManualInput] = useState(false);
+  const [successData, setSuccessData] = useState<{ timestamp: string } | null>(null);
+
+  // Scan line animation
+  const scanLineAnim = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    const loopAnim = Animated.loop(
+      Animated.sequence([
+        Animated.timing(scanLineAnim, {
+          toValue: 220,
+          duration: 2000,
+          useNativeDriver: true,
+        }),
+        Animated.timing(scanLineAnim, {
+          toValue: 0,
+          duration: 2000,
+          useNativeDriver: true,
+        }),
+      ])
+    );
+    loopAnim.start();
+
+    return () => loopAnim.stop();
+  }, [scanLineAnim]);
+
+  const handleBarcodeScanned = async (result: BarcodeScanningResult) => {
+    if (scanned || isProcessing || !currentMembership?.id) return;
+
+    setScanned(true);
+    setIsProcessing(true);
+
+    try {
+      const data = result.data.trim();
+
+      // QR validation: data can be the gym ID or a JSON string with { gym_id: ... }
+      let scannedGymId = data;
+      try {
+        const parsed = JSON.parse(data);
+        if (parsed.gym_id) {
+          scannedGymId = parsed.gym_id;
+        } else if (parsed.gymId) {
+          scannedGymId = parsed.gymId;
+        }
+      } catch {
+        // Raw string format
+      }
+
+      // Check if scanned QR corresponds to current gym
+      if (gymId && scannedGymId !== gymId) {
+        Alert.alert(
+          'Invalid QR Code',
+          'This QR code does not belong to your gym. Please scan the QR code displayed at the gym counter.',
+          [
+            {
+              text: 'Try Again',
+              onPress: () => {
+                setScanned(false);
+                setIsProcessing(false);
+              },
+            },
+          ]
+        );
+        return;
+      }
+
+      // Perform check-in
+      await checkIn(currentMembership.id);
+      setSuccessData({ timestamp: new Date().toLocaleTimeString('en-IN') });
+    } catch (err: any) {
+      console.error('[Scan] Check-in error:', err);
+      Alert.alert(
+        'Check-in Failed',
+        err.message || 'Unable to record check-in. Please try again or ask gym staff.',
+        [
+          {
+            text: 'OK',
+            onPress: () => {
+              setScanned(false);
+              setIsProcessing(false);
+            },
+          },
+        ]
+      );
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  const handleManualCheckIn = async () => {
+    if (!manualCode.trim() || !currentMembership?.id) {
+      Alert.alert('Required', 'Please enter the gym check-in code.');
+      return;
+    }
+
+    setIsProcessing(true);
+    try {
+      // Validate code matches gymId or gymId prefix
+      const code = manualCode.trim().toLowerCase();
+      const targetGym = gymId?.toLowerCase() || '';
+
+      if (!targetGym.includes(code) && code !== 'gym' && code !== 'checkin') {
+        Alert.alert('Invalid Code', 'The code you entered does not match your gym.');
+        setIsProcessing(false);
+        return;
+      }
+
+      await checkIn(currentMembership.id);
+      setSuccessData({ timestamp: new Date().toLocaleTimeString('en-IN') });
+    } catch (err: any) {
+      console.error('[Scan] Manual check-in error:', err);
+      Alert.alert('Check-in Failed', err.message || 'Unable to record check-in.');
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  // Already Checked In View
+  if (hasCheckedInToday && !successData) {
+    return (
+      <View style={[styles.container, styles.centerContent, { backgroundColor: colors.background }]}>
+        <View
+          style={[
+            styles.successCircle,
+            { backgroundColor: isDark ? 'rgba(0, 230, 118, 0.15)' : '#E8F8F0' },
+          ]}
+        >
+          <Ionicons name="checkmark-circle" size={64} color={colors.primary} />
+        </View>
+        <Text style={[styles.successTitle, { color: colors.text }]}>
+          Already Checked In!
+        </Text>
+        <Text style={[styles.successSubtitle, { color: colors.textSecondary }]}>
+          You have already recorded your check-in for today. Have a fantastic workout session!
+        </Text>
+        <Button
+          title="Return to Home"
+          onPress={() => router.replace('/(member)/home')}
+          variant="primary"
+          size="lg"
+          style={styles.returnButton}
+        />
+      </View>
+    );
+  }
+
+  // Success Check-in View
+  if (successData) {
+    return (
+      <View style={[styles.container, styles.centerContent, { backgroundColor: colors.background }]}>
+        <View
+          style={[
+            styles.successCircle,
+            { backgroundColor: isDark ? 'rgba(0, 230, 118, 0.15)' : '#E8F8F0' },
+          ]}
+        >
+          <Ionicons name="fitness" size={56} color={colors.primary} />
+        </View>
+        <Text style={[styles.successTitle, { color: colors.text }]}>
+          Check-in Successful!
+        </Text>
+        <Text style={[styles.successSubtitle, { color: colors.textSecondary }]}>
+          Checked in today at {successData.timestamp}. Welcome to the gym!
+        </Text>
+        <Button
+          title="Done"
+          onPress={() => router.replace('/(member)/home')}
+          variant="primary"
+          size="lg"
+          style={styles.returnButton}
+        />
+      </View>
+    );
+  }
+
+  // Permission Request View
+  if (!permission) {
+    return (
+      <View style={[styles.container, styles.centerContent, { backgroundColor: colors.background }]}>
+        <ActivityIndicator size="large" color={colors.primary} />
+      </View>
+    );
+  }
+
+  if (!permission.granted) {
+    return (
+      <View style={[styles.container, styles.centerContent, { backgroundColor: colors.background }]}>
+        <View style={[styles.permissionIconCircle, { backgroundColor: colors.surfaceElevated }]}>
+          <Ionicons name="camera-outline" size={54} color={colors.warning} />
+        </View>
+        <Text style={[styles.permissionTitle, { color: colors.text }]}>
+          Camera Access Required
+        </Text>
+        <Text style={[styles.permissionSubtitle, { color: colors.textSecondary }]}>
+          Please allow camera access to scan the gym check-in QR code at the reception.
+        </Text>
+        <Button
+          title="Grant Permission"
+          onPress={requestPermission}
+          variant="primary"
+          size="lg"
+          style={styles.grantButton}
+        />
+        <Button
+          title="Enter Code Manually Instead"
+          onPress={() => setShowManualInput(true)}
+          variant="ghost"
+          size="md"
+          style={styles.manualFallbackBtn}
+        />
+      </View>
+    );
+  }
+
+  return (
+    <View style={[styles.container, { backgroundColor: '#000000' }]}>
+      {/* Top Overlay Controls */}
+      <View
+        style={[
+          styles.topBar,
+          { top: Math.max(insets.top + 8, 40) },
+        ]}
+      >
+        <TouchableOpacity
+          onPress={() => router.back()}
+          style={styles.iconCircleButton}
+          activeOpacity={0.7}
+        >
+          <Ionicons name="close" size={24} color="#FFFFFF" />
+        </TouchableOpacity>
+        <Text style={styles.topBarTitle}>Scan QR Code</Text>
+        <TouchableOpacity
+          onPress={() => setShowManualInput((prev) => !prev)}
+          style={styles.iconCircleButton}
+          activeOpacity={0.7}
+        >
+          <Ionicons
+            name={showManualInput ? 'camera' : 'keypad-outline'}
+            size={22}
+            color="#FFFFFF"
+          />
+        </TouchableOpacity>
+      </View>
+
+      {/* Main Content: Scanner or Manual Input */}
+      {showManualInput ? (
+        <View style={[styles.manualContainer, { backgroundColor: colors.background }]}>
+          <View style={[styles.manualIconWrap, { backgroundColor: colors.primaryMuted }]}>
+            <Ionicons name="keypad" size={32} color={colors.primary} />
+          </View>
+          <Text style={[styles.manualTitle, { color: colors.text }]}>
+            Manual Check-In Code
+          </Text>
+          <Text style={[styles.manualSub, { color: colors.textSecondary }]}>
+            Enter the 4 to 8 character daily check-in code provided by gym reception.
+          </Text>
+
+          <Input
+            placeholder="e.g. GYM2024"
+            value={manualCode}
+            onChangeText={setManualCode}
+            autoCapitalize="characters"
+            style={styles.manualInput}
+          />
+
+          <Button
+            title="Check In"
+            onPress={handleManualCheckIn}
+            variant="primary"
+            size="lg"
+            loading={isProcessing}
+            fullWidth
+            icon={<Ionicons name="checkmark-circle-outline" size={22} color="#000000" />}
+          />
+        </View>
+      ) : (
+        <View style={styles.cameraWrapper}>
+          <CameraView
+            style={StyleSheet.absoluteFill}
+            facing="back"
+            barcodeScannerSettings={{
+              barcodeTypes: ['qr'],
+            }}
+            onBarcodeScanned={scanned ? undefined : handleBarcodeScanned}
+          />
+
+          {/* Scanner Overlay */}
+          <View style={styles.overlayLayer}>
+            <View style={styles.overlayTop} />
+
+            <View style={styles.overlayCenterRow}>
+              <View style={styles.overlaySide} />
+
+              <View style={styles.targetFrame}>
+                {/* Corner Markers */}
+                <View style={[styles.corner, styles.topLeft, { borderColor: colors.primary }]} />
+                <View style={[styles.corner, styles.topRight, { borderColor: colors.primary }]} />
+                <View style={[styles.corner, styles.bottomLeft, { borderColor: colors.primary }]} />
+                <View style={[styles.corner, styles.bottomRight, { borderColor: colors.primary }]} />
+
+                {/* Animated Scan Line */}
+                <Animated.View
+                  style={[
+                    styles.scanLine,
+                    {
+                      backgroundColor: colors.primary,
+                      transform: [{ translateY: scanLineAnim }],
+                    },
+                  ]}
+                />
+              </View>
+
+              <View style={styles.overlaySide} />
+            </View>
+
+            <View style={styles.overlayBottom}>
+              <Text style={styles.scanInstructionText}>
+                Align the gym QR code inside the frame
+              </Text>
+              {isProcessing && (
+                <View style={styles.processingRow}>
+                  <ActivityIndicator size="small" color="#00E676" />
+                  <Text style={styles.processingText}>Validating check-in...</Text>
+                </View>
+              )}
+            </View>
+          </View>
+        </View>
+      )}
+
+      {/* Bottom Switch button */}
+      {!showManualInput && (
+        <View style={[styles.bottomControlBar, { paddingBottom: insets.bottom + 20 }]}>
+          <TouchableOpacity
+            style={styles.bottomManualBtn}
+            onPress={() => setShowManualInput(true)}
+            activeOpacity={0.8}
+          >
+            <Ionicons name="keypad-outline" size={18} color="#FFFFFF" />
+            <Text style={styles.bottomManualBtnText}>Can't scan? Enter code</Text>
+          </TouchableOpacity>
+        </View>
+      )}
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+  },
+  centerContent: {
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 24,
+  },
+  topBar: {
+    position: 'absolute',
+    left: 20,
+    right: 20,
+    zIndex: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  topBarTitle: {
+    color: '#FFFFFF',
+    fontSize: 18,
+    fontWeight: '700',
+  },
+  iconCircleButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  cameraWrapper: {
+    flex: 1,
+  },
+  overlayLayer: {
+    ...StyleSheet.absoluteFill,
+  },
+  overlayTop: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.65)',
+  },
+  overlayCenterRow: {
+    flexDirection: 'row',
+    height: 250,
+  },
+  overlaySide: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.65)',
+  },
+  targetFrame: {
+    width: 250,
+    height: 250,
+    position: 'relative',
+  },
+  corner: {
+    position: 'absolute',
+    width: 28,
+    height: 28,
+  },
+  topLeft: {
+    top: 0,
+    left: 0,
+    borderTopWidth: 3.5,
+    borderLeftWidth: 3.5,
+    borderTopLeftRadius: 8,
+  },
+  topRight: {
+    top: 0,
+    right: 0,
+    borderTopWidth: 3.5,
+    borderRightWidth: 3.5,
+    borderTopRightRadius: 8,
+  },
+  bottomLeft: {
+    bottom: 0,
+    left: 0,
+    borderBottomWidth: 3.5,
+    borderLeftWidth: 3.5,
+    borderBottomLeftRadius: 8,
+  },
+  bottomRight: {
+    bottom: 0,
+    right: 0,
+    borderBottomWidth: 3.5,
+    borderRightWidth: 3.5,
+    borderBottomRightRadius: 8,
+  },
+  scanLine: {
+    width: '100%',
+    height: 2.5,
+    borderRadius: 2,
+    shadowColor: '#00E676',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.8,
+    shadowRadius: 6,
+    elevation: 4,
+  },
+  overlayBottom: {
+    flex: 1.2,
+    backgroundColor: 'rgba(0, 0, 0, 0.65)',
+    alignItems: 'center',
+    paddingTop: 28,
+    paddingHorizontal: 24,
+  },
+  scanInstructionText: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '600',
+    textAlign: 'center',
+  },
+  processingRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginTop: 16,
+  },
+  processingText: {
+    color: '#00E676',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  bottomControlBar: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    alignItems: 'center',
+  },
+  bottomManualBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderRadius: 24,
+  },
+  bottomManualBtnText: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  manualContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    paddingHorizontal: 24,
+  },
+  manualIconWrap: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    alignItems: 'center',
+    justifyContent: 'center',
+    alignSelf: 'center',
+    marginBottom: 16,
+  },
+  manualTitle: {
+    fontSize: 22,
+    fontWeight: '800',
+    textAlign: 'center',
+    marginBottom: 6,
+  },
+  manualSub: {
+    fontSize: 14,
+    textAlign: 'center',
+    lineHeight: 20,
+    marginBottom: 24,
+  },
+  manualInput: {
+    marginBottom: 20,
+  },
+  successCircle: {
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 20,
+  },
+  successTitle: {
+    fontSize: 24,
+    fontWeight: '800',
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  successSubtitle: {
+    fontSize: 15,
+    textAlign: 'center',
+    lineHeight: 22,
+    marginBottom: 32,
+  },
+  returnButton: {
+    minWidth: 220,
+  },
+  permissionIconCircle: {
+    width: 96,
+    height: 96,
+    borderRadius: 48,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 20,
+  },
+  permissionTitle: {
+    fontSize: 22,
+    fontWeight: '800',
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  permissionSubtitle: {
+    fontSize: 14,
+    textAlign: 'center',
+    lineHeight: 20,
+    marginBottom: 28,
+  },
+  grantButton: {
+    width: '100%',
+    marginBottom: 12,
+  },
+  manualFallbackBtn: {
+    width: '100%',
+  },
+});
