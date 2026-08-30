@@ -109,6 +109,32 @@ export function daysFromToday(days: number): string {
 }
 
 /**
+ * The local calendar day (YYYY-MM-DD) that a timestamp falls on.
+ *
+ * `timestamp.split('T')[0]` looks equivalent but reads the UTC day, so a 1am
+ * IST check-in would be filed under the previous date.
+ */
+export function localDateOf(timestamp: string): string {
+  return toLocalDateString(new Date(timestamp));
+}
+
+/**
+ * Start and end instants (ISO) of a local calendar day, for querying
+ * timestamptz columns.
+ *
+ * Comparing against a naive `'2026-08-30T00:00:00'` makes Postgres interpret it
+ * as UTC, which in IST is 5:30am — so a plain string range silently covers the
+ * wrong window. Converting through Date produces the correct instants.
+ */
+export function localDayRange(dateStr: string = today()): { start: string; end: string } {
+  const [year, month, day] = dateStr.split('-').map(Number);
+  return {
+    start: new Date(year, month - 1, day, 0, 0, 0, 0).toISOString(),
+    end: new Date(year, month - 1, day, 23, 59, 59, 999).toISOString(),
+  };
+}
+
+/**
  * Format a duration in days to a human-readable string.
  * @example formatDuration(45) → '1 month, 15 days'
  * @example formatDuration(3) → '3 days'

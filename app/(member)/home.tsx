@@ -16,6 +16,7 @@ import { useTheme } from '../../lib/theme';
 import { useSubscriptions } from '../../hooks/useSubscriptions';
 import { useCheckIns } from '../../hooks/useCheckIns';
 import { useAnnouncements } from '../../hooks/useAnnouncements';
+import { canViewAnnouncement } from '../../utils/announcement-audience';
 import { daysRemaining, formatDate, timeAgo, isExpired } from '../../utils/date';
 import Card from '../../components/ui/Card';
 import Button from '../../components/ui/Button';
@@ -143,15 +144,17 @@ export default function MemberHomeScreen() {
 
   // Announcements preview (filtered and limited to 2-3)
   const recentAnnouncements = useMemo(() => {
-    const timing = profile?.preferred_gym_timing?.toLowerCase() || '';
-    const filtered = announcements.filter((a) => {
-      const aud = a.target_audience.toLowerCase();
-      if (aud === 'everyone' || aud === 'active') return true;
-      if (timing && aud === timing) return true;
-      return false;
-    });
-    return filtered.slice(0, 3);
-  }, [announcements, profile?.preferred_gym_timing]);
+    const ctx = {
+      membershipStatus: currentMembership?.status,
+      role: currentMembership?.role,
+      preferredTimeSlot: currentMembership?.preferred_time_slot,
+      autoTimeSlot: currentMembership?.auto_time_slot,
+      preferredGymTiming: profile?.preferred_gym_timing,
+    };
+    return announcements
+      .filter((a) => canViewAnnouncement(a.target_audience, ctx))
+      .slice(0, 3);
+  }, [announcements, profile?.preferred_gym_timing, currentMembership]);
 
   const memberFirstName = profile?.full_name?.split(' ')[0] || 'Member';
   const gymName = currentMembership?.gym?.name || 'My Gym';

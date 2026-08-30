@@ -207,7 +207,10 @@ export default function StaffHomeScreen() {
                 <StatCard
                   title="Evening Slot"
                   value={slotCounts.evening}
-                  subtitle="4 PM – 10 PM"
+                  // TIME_SLOTS.evening is { start: 16, end: 21 } — 4:00 to
+                  // 8:59 PM. The label previously claimed 10 PM, implying two
+                  // hours that are counted in no slot at all.
+                  subtitle="4 PM – 9 PM"
                   icon="moon-outline"
                   color={colors.statusActive}
                   style={styles.statHalf}
@@ -217,6 +220,18 @@ export default function StaffHomeScreen() {
 
             {/* Quick Actions for Staff */}
             <View style={styles.quickNavRow}>
+              <TouchableOpacity
+                style={[
+                  styles.quickNavBtn,
+                  { backgroundColor: colors.surface, borderColor: colors.border },
+                ]}
+                onPress={() => router.push('/(staff)/qr-code')}
+                activeOpacity={0.7}
+              >
+                <Ionicons name="qr-code" size={20} color={colors.success} />
+                <Text style={[styles.quickNavText, { color: colors.text }]}>Check-In Code</Text>
+              </TouchableOpacity>
+
               <TouchableOpacity
                 style={[
                   styles.quickNavBtn,
@@ -351,16 +366,21 @@ const styles = StyleSheet.create({
   },
   quickNavRow: {
     flexDirection: 'row',
+    // Wraps to a 2x2 grid. Four of these side by side on a phone squeezed the
+    // labels hard enough to break "Announcements" across lines mid-word.
+    flexWrap: 'wrap',
     gap: 10,
     marginBottom: 24,
   },
   quickNavBtn: {
-    flex: 1,
+    // ~half the row minus the gap, so two fit per line.
+    flexBasis: '47%',
+    flexGrow: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 6,
-    paddingVertical: 12,
+    paddingVertical: 14,
     borderRadius: 12,
     borderWidth: 1,
   },

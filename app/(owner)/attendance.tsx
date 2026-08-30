@@ -127,11 +127,24 @@ export default function OwnerTodayAttendanceScreen() {
           </Text>
         </View>
 
-        <Badge
-          text={`${records.length} Check-ins`}
-          variant="success"
-          size="md"
-        />
+        <View style={styles.headerActions}>
+          <Badge
+            text={`${records.length} Check-ins`}
+            variant="success"
+            size="md"
+          />
+          <TouchableOpacity
+            onPress={() => router.push('/(owner)/qr-code')}
+            activeOpacity={0.8}
+            accessibilityLabel="Show check-in QR code"
+            style={[
+              styles.qrButton,
+              { backgroundColor: colors.primaryMuted, borderColor: colors.primary },
+            ]}
+          >
+            <Ionicons name="qr-code-outline" size={20} color={colors.primary} />
+          </TouchableOpacity>
+        </View>
       </View>
 
       {/* Search Input */}
@@ -242,6 +255,19 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingTop: 54,
     paddingBottom: 14,
+  },
+  headerActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  qrButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    borderWidth: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   backButton: {
     width: 40,

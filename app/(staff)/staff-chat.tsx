@@ -6,7 +6,6 @@ import {
   TextInput,
   TouchableOpacity,
   KeyboardAvoidingView,
-  Platform,
   StyleSheet,
   ActivityIndicator,
 } from 'react-native';
@@ -28,11 +27,28 @@ export default function StaffChatScreen() {
     messages,
     loading,
     sendMessage,
+    markAsRead,
   } = useStaffChat();
 
   const [inputText, setInputText] = useState('');
   const [isSending, setIsSending] = useState(false);
   const flatListRef = useRef<FlatList>(null);
+
+  // Mark unread messages on view. The owner screen did this; the staff screen
+  // did not, so a staff member's unread count never cleared.
+  useEffect(() => {
+    if (messages.length > 0 && profile?.id) {
+      const unreadIds = messages
+        // Skip your own messages — you're never in read_by for them, so
+        // including them meant an extra RPC + refetch after every send.
+        .filter((m) => m.sender?.id !== profile.id && !m.read_by?.includes(profile.id))
+        .map((m) => m.id);
+
+      if (unreadIds.length > 0) {
+        markAsRead(unreadIds);
+      }
+    }
+  }, [messages, profile?.id, markAsRead]);
 
   // Invert messages list for chat UI
   const invertedMessages = useMemo(() => {
@@ -47,6 +63,13 @@ export default function StaffChatScreen() {
     setIsSending(true);
     try {
       await sendMessage(text);
+      // Jump to your own message after sending. This list is `inverted`, so the
+      // newest message sits at offset 0 — scrollToEnd would go to the OLDEST.
+      // Only done for the sender: scrolling on every incoming message would
+      // drag the reader away from history whenever someone else typed.
+      setTimeout(() => {
+        flatListRef.current?.scrollToOffset({ offset: 0, animated: true });
+      }, 150);
     } catch (err: any) {
       console.error('[StaffChat] Send error:', err);
       // Restore input text on failure
@@ -117,8 +140,16 @@ export default function StaffChatScreen() {
   return (
     <KeyboardAvoidingView
       style={[styles.container, { backgroundColor: colors.background }]}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      keyboardVerticalOffset={Platform.OS === 'ios' ? 10 : 0}
+      // 'padding' on BOTH platforms, not 'height' on Android.
+      //
+      // Android needs an explicit behavior at all (it was `undefined`, so the
+      // keyboard covered the input). But 'height' shrinks this view, and during
+      // the resize the Android window background shows through as a white flash
+      // before the keyboard covers it. 'padding' keeps the view full-size and
+      // only insets its content, so nothing is ever exposed and the transition
+      // stays smooth.
+      behavior="padding"
+      keyboardVerticalOffset={0}
     >
       {/* Header */}
       <View
@@ -162,6 +193,26 @@ export default function StaffChatScreen() {
             Loading messages...
           </Text>
         </View>
+      ) : invertedMessages.length === 0 ? (
+        /*
+          Rendered as a sibling rather than via ListEmptyComponent. An
+          `inverted` FlatList flips its content, and the empty component was
+          coming out upside-down: it sits outside the inverted transform on
+          this RN version, so the manual scaleY(-1) "correction" was doing the
+          flipping rather than undoing it. Keeping it out of the list avoids
+          depending on that behaviour at all.
+        */
+        <View style={styles.emptyContainer}>
+          <View style={[styles.emptyIconWrap, { backgroundColor: colors.surfaceElevated }]}>
+            <Ionicons name="chatbubbles-outline" size={48} color={colors.textTertiary} />
+          </View>
+          <Text style={[styles.emptyTitle, { color: colors.text }]}>
+            No messages yet
+          </Text>
+          <Text style={[styles.emptySubtitle, { color: colors.textSecondary }]}>
+            Start the conversation with your gym team and staff colleagues.
+          </Text>
+        </View>
       ) : (
         <FlatList
           ref={flatListRef}
@@ -171,19 +222,6 @@ export default function StaffChatScreen() {
           inverted
           contentContainerStyle={styles.listContent}
           showsVerticalScrollIndicator={false}
-          ListEmptyComponent={
-            <View style={styles.emptyContainer}>
-              <View style={[styles.emptyIconWrap, { backgroundColor: colors.surfaceElevated }]}>
-                <Ionicons name="chatbubbles-outline" size={48} color={colors.textTertiary} />
-              </View>
-              <Text style={[styles.emptyTitle, { color: colors.text }]}>
-                No messages yet
-              </Text>
-              <Text style={[styles.emptySubtitle, { color: colors.textSecondary }]}>
-                Start the conversation with your gym team and staff colleagues.
-              </Text>
-            </View>
-          }
         />
       )}
 
@@ -358,7 +396,8 @@ const styles = StyleSheet.create({
     fontSize: 14,
   },
   emptyContainer: {
-    transform: [{ scaleY: -1 }], // Inverted list correction
+    // No scaleY correction: this renders outside the inverted FlatList now.
+    flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: 80,

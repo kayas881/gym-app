@@ -1,8 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useSupabase } from './useSupabase';
 import { useAppAuth } from '../lib/auth';
-import { calculateEndDate, today } from '../utils/date';
-import { generateReceiptNumber } from '../utils/receipt-template';
 
 interface Subscription {
   id: string;
@@ -88,42 +86,38 @@ export function useSubscriptions(gymMemberId?: string) {
     fetchSubscriptions();
   }, [fetchSubscriptions]);
 
-  // Create a new subscription (record payment)
+  // Create a new subscription (record payment).
+  //
+  // Delegates to a Postgres function so the whole thing is ONE transaction.
+  // This previously ran four sequential unguarded writes (read plan, expire old
+  // subscription, insert new, activate member); a failure after the insert left
+  // a member paid but still 'pending', while the caller reported failure. The
+  // function also generates the receipt number with a retry, instead of the
+  // client minting one against a UNIQUE column with no collision handling.
   const createSubscription = useCallback(
     async (input: CreateSubscriptionInput) => {
-      // Get plan details for calculating end date
-      const { data: plan, error: planError } = await supabase
-        .from('membership_plans')
-        .select('duration_months')
-        .eq('id', input.planId)
-        .single();
+      const { data: created, error: rpcError } = await supabase.rpc(
+        'record_subscription_payment',
+        {
+          p_gym_member_id: input.gymMemberId,
+          p_plan_id: input.planId,
+          p_amount_paid: input.amountPaid,
+          p_payment_method: input.paymentMethod,
+          p_start_date: input.startDate ?? null,
+        }
+      );
 
-      if (planError) throw planError;
+      if (rpcError) throw rpcError;
 
-      const startDate = input.startDate || today();
-      const endDate = calculateEndDate(startDate, plan.duration_months);
-      const receiptNumber = generateReceiptNumber();
+      const createdRow = (Array.isArray(created) ? created[0] : created) as
+        | { id: string }
+        | null;
+      if (!createdRow?.id) throw new Error('Payment was not recorded.');
 
-      // Mark any existing active subscription as expired
-      await supabase
+      // Read the row back with the plan joined, so callers (the receipt screen)
+      // keep getting the same shape they did before.
+      const { data, error: readError } = await supabase
         .from('subscriptions')
-        .update({ status: 'expired' })
-        .eq('gym_member_id', input.gymMemberId)
-        .eq('status', 'active');
-
-      // Create the new subscription
-      const { data, error: insertError } = await supabase
-        .from('subscriptions')
-        .insert({
-          gym_member_id: input.gymMemberId,
-          plan_id: input.planId,
-          amount_paid: input.amountPaid,
-          payment_method: input.paymentMethod,
-          start_date: startDate,
-          end_date: endDate,
-          receipt_number: receiptNumber,
-          status: 'active',
-        })
         .select(`
           *,
           plan:membership_plans (
@@ -133,15 +127,10 @@ export function useSubscriptions(gymMemberId?: string) {
             price
           )
         `)
+        .eq('id', createdRow.id)
         .single();
 
-      if (insertError) throw insertError;
-
-      // Also update member status to active
-      await supabase
-        .from('gym_members')
-        .update({ status: 'active', updated_at: new Date().toISOString() })
-        .eq('id', input.gymMemberId);
+      if (readError) throw readError;
 
       await fetchSubscriptions();
       return data as Subscription;

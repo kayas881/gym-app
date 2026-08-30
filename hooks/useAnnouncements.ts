@@ -9,6 +9,8 @@ interface Announcement {
   body: string;
   target_audience: string;
   created_at: string;
+  /** Used to identify the author reliably; names are not unique. */
+  author_id: string;
   author: {
     full_name: string;
     photo_url: string | null;
@@ -23,7 +25,7 @@ interface CreateAnnouncementInput {
 
 export function useAnnouncements() {
   const supabase = useSupabase();
-  const { gymId, profile } = useAppAuth();
+  const { gymId, profile, role } = useAppAuth();
   const [announcements, setAnnouncements] = useState<Announcement[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -32,7 +34,7 @@ export function useAnnouncements() {
 
     setLoading(true);
     try {
-      const { data, error } = await supabase
+      let query = supabase
         .from('announcements')
         .select(`
           id,
@@ -41,12 +43,25 @@ export function useAnnouncements() {
           body,
           target_audience,
           created_at,
+          author_id,
           author:profiles!author_id (
             full_name,
             photo_url
           )
         `)
-        .eq('gym_id', gymId)
+        .eq('gym_id', gymId);
+
+      // Don't ship staff-only announcements to plain members.
+      //
+      // announcements_select_policy is is_gym_member_or_owner(gym_id), so RLS
+      // permits every member to read every row — audience is enforced only in
+      // the UI. Without this the full title and body of a staff-only post sat
+      // in a member's fetched data even though the list hid it.
+      if (role !== 'owner' && role !== 'staff') {
+        query = query.neq('target_audience', 'staff');
+      }
+
+      const { data, error } = await query
         .order('created_at', { ascending: false })
         .limit(50);
 
@@ -61,7 +76,7 @@ export function useAnnouncements() {
     } finally {
       setLoading(false);
     }
-  }, [gymId, supabase]);
+  }, [gymId, supabase, role]);
 
   useEffect(() => {
     fetchAnnouncements();
@@ -103,16 +118,41 @@ export function useAnnouncements() {
     async (input: CreateAnnouncementInput) => {
       if (!gymId || !profile?.id) throw new Error('Not authenticated');
 
-      const { error } = await supabase.from('announcements').insert({
-        gym_id: gymId,
-        author_id: profile.id,
-        title: input.title,
-        body: input.body,
-        target_audience: input.targetAudience,
-      });
+      // Need the id back to trigger push, so select the inserted row.
+      // announcements_select_policy resolves through gyms/gym_members, which
+      // already exist here, so RETURNING is safe.
+      const { data: created, error } = await supabase
+        .from('announcements')
+        .insert({
+          gym_id: gymId,
+          author_id: profile.id,
+          title: input.title,
+          body: input.body,
+          target_audience: input.targetAudience,
+        })
+        .select('id')
+        .single();
 
       if (error) throw error;
       await fetchAnnouncements();
+
+      // Fire the push notification. Deliberately not awaited into the caller's
+      // error path: the announcement is already saved and visible in-app, so a
+      // notification failure must not make posting look like it failed.
+      if (created?.id) {
+        supabase.functions
+          .invoke('notify-announcement', {
+            body: { announcement_id: created.id },
+          })
+          .then(({ error: fnError }) => {
+            if (fnError) {
+              console.warn('[useAnnouncements] push notify failed:', fnError.message);
+            }
+          })
+          .catch((err) => {
+            console.warn('[useAnnouncements] push notify threw:', err);
+          });
+      }
     },
     [gymId, profile?.id, supabase, fetchAnnouncements]
   );

@@ -3,9 +3,13 @@ import { StyleSheet, Platform } from 'react-native';
 import { Tabs } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../../lib/theme';
+import { useStaffChat } from '../../hooks/useStaffChat';
 
 export default function StaffLayout() {
   const { colors } = useTheme();
+  // Drives the Chat tab badge. Previously nothing anywhere indicated that a
+  // new message had arrived — you had to open the chat to find out.
+  const { unreadCount } = useStaffChat();
 
   return (
     <Tabs
@@ -72,6 +76,7 @@ export default function StaffLayout() {
         name="staff-chat"
         options={{
           title: 'Chat',
+          tabBarBadge: unreadCount > 0 ? unreadCount : undefined,
           tabBarIcon: ({ color, size, focused }) => (
             <Ionicons
               name={focused ? 'chatbubbles' : 'chatbubbles-outline'}
@@ -96,8 +101,9 @@ export default function StaffLayout() {
         }}
       />
 
-      {/* Pushed from the announcements list — not a tab. */}
+      {/* Pushed from other screens — not tabs. */}
       <Tabs.Screen name="announcements/create" options={{ href: null }} />
+      <Tabs.Screen name="qr-code" options={{ href: null }} />
     </Tabs>
   );
 }

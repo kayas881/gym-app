@@ -49,7 +49,14 @@
           "photosPermission": "Allow Gym App to access your photos to set a profile picture."
         }
       ],
-      "expo-web-browser"
+      "expo-web-browser",
+      [
+        "expo-notifications",
+        {
+          "color": "#00E676",
+          "defaultChannel": "default"
+        }
+      ]
     ],
     "extra": {
       "router": {

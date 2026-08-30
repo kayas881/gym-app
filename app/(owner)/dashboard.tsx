@@ -15,12 +15,13 @@ import { Ionicons } from '@expo/vector-icons';
 import { useAppAuth } from '../../lib/auth';
 import { useTheme } from '../../lib/theme';
 import StatCard from '../../components/StatCard';
+import PeakHoursChart from '../../components/PeakHoursChart';
 import Avatar from '../../components/ui/Avatar';
 import Badge from '../../components/ui/Badge';
 import Card from '../../components/ui/Card';
 import Button from '../../components/ui/Button';
 import Input from '../../components/ui/Input';
-import { formatDate, formatDateTime, timeAgo, today, daysFromToday } from '../../utils/date';
+import { formatDate, formatDateTime, timeAgo, today, daysFromToday, localDayRange } from '../../utils/date';
 import { useAnnouncements } from '../../hooks/useAnnouncements';
 import { useComplaints } from '../../hooks/useComplaints';
 
@@ -165,7 +166,7 @@ export default function OwnerDashboardScreen() {
       });
 
       // 4. Today's attendance
-      const todayStr = today();
+      const { start: dayStart, end: dayEnd } = localDayRange();
       const { data: attendanceData, error: attError, count: attCount } = await supabase
         .from('check_ins')
         .select(
@@ -183,8 +184,8 @@ export default function OwnerDashboardScreen() {
           { count: 'exact' }
         )
         .eq('gym_id', gymId)
-        .gte('checked_in_at', `${todayStr}T00:00:00`)
-        .lte('checked_in_at', `${todayStr}T23:59:59`)
+        .gte('checked_in_at', dayStart)
+        .lte('checked_in_at', dayEnd)
         .order('checked_in_at', { ascending: false })
         .limit(4);
 
@@ -418,7 +419,31 @@ export default function OwnerDashboardScreen() {
                   Manage Plans
                 </Text>
               </TouchableOpacity>
+
+              {/*
+                The announcements feed had no entry point at all: the quick
+                action above only opens the compose modal, so an owner could
+                post but never review what they or their staff had posted.
+              */}
+              <TouchableOpacity
+                style={[
+                  styles.quickActionButton,
+                  { backgroundColor: colors.surface, borderColor: colors.border },
+                ]}
+                onPress={() => router.push('/(owner)/announcements')}
+                activeOpacity={0.7}
+              >
+                <View style={[styles.quickActionIconCircle, { backgroundColor: isDark ? 'rgba(68, 138, 255, 0.15)' : 'rgba(25, 118, 210, 0.12)' }]}>
+                  <Ionicons name="list-outline" size={22} color={colors.info} />
+                </View>
+                <Text style={[styles.quickActionText, { color: colors.text }]}>
+                  All Announcements
+                </Text>
+              </TouchableOpacity>
             </View>
+
+            {/* Peak Hours (Phase 3 item 7) */}
+            <PeakHoursChart />
 
             {/* Today's Attendance Section */}
             <View style={styles.attendanceSection}>
@@ -633,8 +658,16 @@ export default function OwnerDashboardScreen() {
                       : 'error';
 
                   return (
-                    <View
+                    <TouchableOpacity
                       key={c.id}
+                      activeOpacity={0.8}
+                      // The full detail screen is the only place the attached
+                      // photo and the reply box are rendered; this modal is a
+                      // summary, so it has to lead there.
+                      onPress={() => {
+                        setComplaintsModalVisible(false);
+                        router.push(`/(owner)/complaints/${c.id}`);
+                      }}
                       style={[
                         styles.complaintCard,
                         { backgroundColor: colors.card, borderColor: colors.border },
@@ -714,9 +747,44 @@ export default function OwnerDashboardScreen() {
                           />
                         </View>
                       )}
-                    </View>
+
+                      <View style={styles.complaintOpenRow}>
+                        {c.photo_url ? (
+                          <View style={styles.complaintPhotoHint}>
+                            <Ionicons name="image-outline" size={14} color={colors.textTertiary} />
+                            <Text style={[styles.complaintOpenText, { color: colors.textTertiary }]}>
+                              Photo attached
+                            </Text>
+                          </View>
+                        ) : (
+                          <View />
+                        )}
+                        <View style={styles.complaintPhotoHint}>
+                          <Text style={[styles.complaintOpenText, { color: colors.primary }]}>
+                            View details
+                          </Text>
+                          <Ionicons name="chevron-forward" size={14} color={colors.primary} />
+                        </View>
+                      </View>
+                    </TouchableOpacity>
                   );
                 })
+              )}
+
+              {complaints.length > 0 && (
+                <TouchableOpacity
+                  activeOpacity={0.8}
+                  onPress={() => {
+                    setComplaintsModalVisible(false);
+                    router.push('/(owner)/complaints');
+                  }}
+                  style={[styles.viewAllComplaints, { borderColor: colors.border }]}
+                >
+                  <Text style={[styles.complaintOpenText, { color: colors.primary }]}>
+                    View all complaints
+                  </Text>
+                  <Ionicons name="arrow-forward" size={16} color={colors.primary} />
+                </TouchableOpacity>
               )}
             </ScrollView>
           </View>
@@ -727,6 +795,30 @@ export default function OwnerDashboardScreen() {
 }
 
 const styles = StyleSheet.create({
+  viewAllComplaints: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingVertical: 14,
+    marginTop: 4,
+    borderTopWidth: 1,
+  },
+  complaintOpenRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: 10,
+  },
+  complaintPhotoHint: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  complaintOpenText: {
+    fontSize: 12,
+    fontWeight: '600',
+  },
   screen: {
     flex: 1,
   },
@@ -820,14 +912,16 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     borderWidth: 1,
     paddingVertical: 14,
-    paddingHorizontal: 12,
+    // Tightened from 12/10 with a 40px icon: that left ~98dp for the label,
+    // too narrow for "Announcement" (~110dp at 13px), so it broke mid-word.
+    paddingHorizontal: 10,
     alignItems: 'center',
     flexDirection: 'row',
-    gap: 10,
+    gap: 8,
   },
   quickActionIconCircle: {
-    width: 40,
-    height: 40,
+    width: 36,
+    height: 36,
     borderRadius: 10,
     alignItems: 'center',
     justifyContent: 'center',
@@ -839,7 +933,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   quickActionText: {
-    fontSize: 13,
+    fontSize: 12,
     fontWeight: '600',
     flexShrink: 1,
   },

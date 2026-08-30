@@ -12,6 +12,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAppAuth } from '../../lib/auth';
 import { useTheme } from '../../lib/theme';
 import { useAnnouncements } from '../../hooks/useAnnouncements';
+import { canViewAnnouncement } from '../../utils/announcement-audience';
 import { timeAgo, formatDateTime } from '../../utils/date';
 import Avatar from '../../components/ui/Avatar';
 import Badge from '../../components/ui/Badge';
@@ -35,21 +36,17 @@ export default function MemberAnnouncementsScreen() {
     setRefreshing(false);
   }, [refresh]);
 
-  // Filter announcements matching target audience
+  // Filter announcements matching target audience.
+  // Shared with the home-screen preview so the rules can't drift apart.
   const filteredAnnouncements = useMemo(() => {
-    const memberTiming = (
-      profile?.preferred_gym_timing ||
-      (currentMembership as any)?.preferred_time_slot ||
-      ''
-    ).toLowerCase();
-
-    return announcements.filter((a) => {
-      const target = (a.target_audience || 'everyone').toLowerCase();
-      if (target === 'everyone') return true;
-      if (target === 'active') return true;
-      if (memberTiming && target === memberTiming) return true;
-      return false;
-    });
+    const ctx = {
+      membershipStatus: currentMembership?.status,
+      role: currentMembership?.role,
+      preferredTimeSlot: currentMembership?.preferred_time_slot,
+      autoTimeSlot: currentMembership?.auto_time_slot,
+      preferredGymTiming: profile?.preferred_gym_timing,
+    };
+    return announcements.filter((a) => canViewAnnouncement(a.target_audience, ctx));
   }, [announcements, profile?.preferred_gym_timing, currentMembership]);
 
   const renderAnnouncementItem = ({ item }: { item: (typeof announcements)[0] }) => {

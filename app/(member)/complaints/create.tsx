@@ -16,6 +16,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAppAuth } from '../../../lib/auth';
 import { useTheme } from '../../../lib/theme';
+import { uploadImageAssetToPath } from '../../../lib/storage';
 import { useComplaints } from '../../../hooks/useComplaints';
 import Input from '../../../components/ui/Input';
 import Button from '../../../components/ui/Button';
@@ -23,7 +24,7 @@ import Button from '../../../components/ui/Button';
 export default function CreateComplaintScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { gymId, currentMembership } = useAppAuth();
+  const { gymId, currentMembership, supabase, userId } = useAppAuth();
   const { colors, isDark } = useTheme();
 
   const { submitComplaint } = useComplaints();
@@ -31,6 +32,8 @@ export default function CreateComplaintScreen() {
   const [subject, setSubject] = useState('');
   const [body, setBody] = useState('');
   const [selectedPhoto, setSelectedPhoto] = useState<string | null>(null);
+  const [pendingPhotoAsset, setPendingPhotoAsset] =
+    useState<ImagePicker.ImagePickerAsset | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errors, setErrors] = useState<{ subject?: string; body?: string }>({});
 
@@ -49,10 +52,14 @@ export default function CreateComplaintScreen() {
         mediaTypes: ImagePicker.MediaTypeOptions.Images,
         allowsEditing: true,
         quality: 0.7,
+        // Needed to upload without expo-file-system (see lib/storage.ts).
+        base64: true,
       });
 
       if (!result.canceled && result.assets && result.assets[0]?.uri) {
+        // Preview the local file; it is uploaded on submit.
         setSelectedPhoto(result.assets[0].uri);
+        setPendingPhotoAsset(result.assets[0]);
       }
     } catch (err) {
       console.error('[CreateComplaint] Error picking image:', err);
@@ -62,6 +69,7 @@ export default function CreateComplaintScreen() {
 
   const handleRemovePhoto = () => {
     setSelectedPhoto(null);
+    setPendingPhotoAsset(null);
   };
 
   const validate = (): boolean => {
@@ -88,10 +96,35 @@ export default function CreateComplaintScreen() {
 
     setIsSubmitting(true);
     try {
+      // Upload the attachment to Storage and record its public URL. Saving the
+      // raw ImagePicker path would leave the owner with an unreachable
+      // file:///... reference on their own device.
+      let photoUrl: string | undefined;
+      if (pendingPhotoAsset && userId) {
+        try {
+          // Stores the storage PATH, not a URL: complaint-photos is a private
+          // bucket, so the owner screen mints a short-lived signed URL to view it.
+          photoUrl = await uploadImageAssetToPath(
+            supabase,
+            'complaint-photos',
+            userId,
+            pendingPhotoAsset
+          );
+        } catch (uploadErr: any) {
+          console.error('[CreateComplaint] Photo upload failed:', uploadErr);
+          Alert.alert(
+            'Photo Upload Failed',
+            uploadErr?.message ||
+              'Could not upload your photo. Submit without it, or try again.'
+          );
+          return;
+        }
+      }
+
       await submitComplaint({
         subject: subject.trim(),
         body: body.trim(),
-        photoUrl: selectedPhoto || undefined,
+        photoUrl,
       });
 
       Alert.alert(

@@ -167,6 +167,13 @@ export function generateReceiptHTML(data: ReceiptData): string {
  * Generate a unique receipt number.
  * Format: GYM-YYYYMMDD-XXXX (e.g., GYM-20240315-A3B7)
  */
+/**
+ * @deprecated Receipt numbers are now generated inside the
+ * `record_subscription_payment` Postgres function, which retries on collision.
+ * This client-side version used only 4 random base-36 characters per day
+ * against a UNIQUE NOT NULL column with no retry. Kept for reference only —
+ * nothing calls it.
+ */
 export function generateReceiptNumber(): string {
   const now = new Date();
   const dateStr = now.toISOString().split('T')[0].replace(/-/g, '');

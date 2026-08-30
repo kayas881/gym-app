@@ -68,9 +68,14 @@ export default function StatCard({
       ]}
     >
       <View style={styles.headerRow}>
+        {/*
+          Two lines, because one truncated "Active Members" to "Active …" and
+          "Afternoon Slot" to "Afternoon S…". The icon sits beside it, so a
+          single line leaves very little room on narrow screens.
+        */}
         <Text
           style={[styles.title, { color: colors.textSecondary }]}
-          numberOfLines={1}
+          numberOfLines={2}
         >
           {title}
         </Text>

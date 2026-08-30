@@ -15,6 +15,7 @@ import {
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useAppAuth } from '../../../lib/auth';
+import { createSignedImageUrl } from '../../../lib/storage';
 import { useTheme } from '../../../lib/theme';
 import { useComplaints } from '../../../hooks/useComplaints';
 import Card from '../../../components/ui/Card';
@@ -61,6 +62,27 @@ export default function OwnerComplaintDetailScreen() {
   const [photoViewerVisible, setPhotoViewerVisible] = useState(false);
 
   // Fetch complaint details
+  // complaint-photos is a PRIVATE bucket, so complaints.photo_url holds the
+  // storage path rather than a viewable URL. Mint a short-lived signed URL for
+  // display; it expires, which is the point of keeping the bucket private.
+  const [photoSignedUrl, setPhotoSignedUrl] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    const path = complaint?.photo_url;
+    if (!path) {
+      setPhotoSignedUrl(null);
+      return;
+    }
+    (async () => {
+      const url = await createSignedImageUrl(supabase, 'complaint-photos', path);
+      if (!cancelled) setPhotoSignedUrl(url);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [complaint?.photo_url, supabase]);
+
   const fetchComplaint = useCallback(async () => {
     if (!id || !gymId) return;
 
@@ -275,7 +297,7 @@ export default function OwnerComplaintDetailScreen() {
           </View>
 
           {/* Attached Photo */}
-          {complaint.photo_url ? (
+          {complaint.photo_url && photoSignedUrl ? (
             <View style={styles.photoContainer}>
               <Text style={[styles.photoLabel, { color: colors.textSecondary }]}>
                 Attached Photo Evidence:
@@ -285,7 +307,7 @@ export default function OwnerComplaintDetailScreen() {
                 activeOpacity={0.9}
               >
                 <Image
-                  source={{ uri: complaint.photo_url }}
+                  source={{ uri: photoSignedUrl }}
                   style={[styles.attachedImage, { borderColor: colors.border }]}
                   resizeMode="cover"
                 />
@@ -374,7 +396,7 @@ export default function OwnerComplaintDetailScreen() {
       </ScrollView>
 
       {/* Full Photo Modal */}
-      {complaint.photo_url && (
+      {photoSignedUrl && (
         <Modal
           visible={photoViewerVisible}
           transparent={true}
@@ -390,7 +412,7 @@ export default function OwnerComplaintDetailScreen() {
             </TouchableOpacity>
 
             <Image
-              source={{ uri: complaint.photo_url }}
+              source={{ uri: photoSignedUrl }}
               style={styles.fullScreenImage}
               resizeMode="contain"
             />

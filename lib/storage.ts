@@ -18,9 +18,17 @@ import type { ImagePickerAsset } from 'expo-image-picker';
  *
  * @returns the public URL to persist in the database
  */
-export async function uploadImageAsset(
+export type StorageBucket = 'profile-photos' | 'gym-logos' | 'complaint-photos';
+
+/**
+ * Uploads the asset and returns its STORAGE PATH (e.g. `user_abc/123.jpg`).
+ *
+ * Private buckets have no public URL, so the path is what must be persisted —
+ * a signed URL is minted at display time and expires.
+ */
+export async function uploadImageAssetToPath(
   supabase: SupabaseClient,
-  bucket: 'profile-photos' | 'gym-logos',
+  bucket: StorageBucket,
   clerkId: string,
   asset: Pick<ImagePickerAsset, 'base64' | 'uri' | 'mimeType'>
 ): Promise<string> {
@@ -38,7 +46,8 @@ export async function uploadImageAsset(
       : 'jpg';
 
   // Unique name per upload so a replaced photo can't be served from a CDN
-  // cache under the old URL.
+  // cache under the old URL. The first path segment is the clerk id, which is
+  // what the storage policies authorise writes against.
   const path = `${clerkId}/${Date.now()}.${extension}`;
 
   const { error } = await supabase.storage
@@ -49,9 +58,47 @@ export async function uploadImageAsset(
     });
 
   if (error) throw error;
+  return path;
+}
 
+export async function uploadImageAsset(
+  supabase: SupabaseClient,
+  bucket: StorageBucket,
+  clerkId: string,
+  asset: Pick<ImagePickerAsset, 'base64' | 'uri' | 'mimeType'>
+): Promise<string> {
+  const path = await uploadImageAssetToPath(supabase, bucket, clerkId, asset);
   const { data } = supabase.storage.from(bucket).getPublicUrl(path);
   return data.publicUrl;
+}
+
+/**
+ * Mints a temporary URL for an object in a PRIVATE bucket.
+ *
+ * Returns null rather than throwing so a missing or unauthorised attachment
+ * degrades to "no image" instead of breaking the screen around it.
+ */
+export async function createSignedImageUrl(
+  supabase: SupabaseClient,
+  bucket: StorageBucket,
+  path: string,
+  expiresInSeconds = 3600
+): Promise<string | null> {
+  // Tolerate rows written while the bucket was public, which stored a full URL.
+  const objectPath = path.startsWith('http')
+    ? path.split(`/${bucket}/`)[1] ?? null
+    : path;
+  if (!objectPath) return null;
+
+  const { data, error } = await supabase.storage
+    .from(bucket)
+    .createSignedUrl(objectPath, expiresInSeconds);
+
+  if (error) {
+    console.warn('[storage] Could not sign URL:', error.message);
+    return null;
+  }
+  return data?.signedUrl ?? null;
 }
 
 /**

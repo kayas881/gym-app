@@ -32,7 +32,9 @@ export default function OwnerStaffChatScreen() {
   useEffect(() => {
     if (messages.length > 0 && profile?.id) {
       const unreadIds = messages
-        .filter((m) => !m.read_by?.includes(profile.id))
+        // Skip your own messages — you're never in read_by for them, so
+        // including them meant an extra RPC + refetch after every send.
+        .filter((m) => m.sender?.id !== profile.id && !m.read_by?.includes(profile.id))
         .map((m) => m.id);
 
       if (unreadIds.length > 0) {
@@ -41,11 +43,18 @@ export default function OwnerStaffChatScreen() {
     }
   }, [messages, profile?.id, markAsRead]);
 
-  // Scroll to bottom whenever messages update
+  // Jump to the newest message on FIRST load only.
+  //
+  // This used to run on every messages.length change, which yanked the reader
+  // back to the bottom whenever anyone else sent a message — you could never
+  // scroll up and read history. Auto-scrolling now happens only for the person
+  // who sent the message (see handleSend).
+  const hasAutoScrolledRef = useRef(false);
   useEffect(() => {
-    if (messages.length > 0) {
+    if (messages.length > 0 && !hasAutoScrolledRef.current) {
+      hasAutoScrolledRef.current = true;
       const timer = setTimeout(() => {
-        flatListRef.current?.scrollToEnd({ animated: true });
+        flatListRef.current?.scrollToEnd({ animated: false });
       }, 100);
       return () => clearTimeout(timer);
     }
@@ -166,8 +175,16 @@ export default function OwnerStaffChatScreen() {
   return (
     <KeyboardAvoidingView
       style={[styles.screen, { backgroundColor: colors.background }]}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
+      // 'padding' on BOTH platforms, not 'height' on Android.
+      //
+      // Android needs an explicit behavior at all (it was `undefined`, so the
+      // keyboard covered the input). But 'height' shrinks this view, and during
+      // the resize the Android window background shows through as a white flash
+      // before the keyboard covers it. 'padding' keeps the view full-size and
+      // only insets its content, so nothing is ever exposed and the transition
+      // stays smooth.
+      behavior="padding"
+      keyboardVerticalOffset={0}
     >
       {/* Header */}
       <View style={[styles.header, { borderBottomColor: colors.border, backgroundColor: colors.surface }]}>
@@ -210,7 +227,12 @@ export default function OwnerStaffChatScreen() {
           contentContainerStyle={styles.messageListContent}
           showsVerticalScrollIndicator={false}
           onContentSizeChange={() => {
-            if (messages.length > 0) {
+            // Initial layout only. Unguarded, this fired on every content
+            // change — including someone else's incoming message — and dragged
+            // the reader back to the bottom, which is exactly what the
+            // effect above was changed to avoid.
+            if (messages.length > 0 && !hasAutoScrolledRef.current) {
+              hasAutoScrolledRef.current = true;
               flatListRef.current?.scrollToEnd({ animated: false });
             }
           }}

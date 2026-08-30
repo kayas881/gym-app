@@ -21,7 +21,7 @@ import Badge from '../../../components/ui/Badge';
 import Button from '../../../components/ui/Button';
 import Input from '../../../components/ui/Input';
 import StatusBadge from '../../../components/ui/StatusBadge';
-import { daysRemaining, formatDate, formatDateTime, today } from '../../../utils/date';
+import { daysRemaining, formatDate, formatDateTime, today, localDateOf } from '../../../utils/date';
 
 interface MemberDetail {
   id: string;
@@ -83,6 +83,37 @@ export default function MemberDetailScreen() {
   const [paymentMethod, setPaymentMethod] = useState<'cash' | 'upi' | 'online'>('cash');
   const [startDate, setStartDate] = useState<string>(today());
   const [savingPayment, setSavingPayment] = useState(false);
+
+  // Recent check-ins for this member (Phase 2 item 5). This was deferred until
+  // Phase 3 built check-in, because before that check_ins was always empty.
+  const [checkIns, setCheckIns] = useState<{ id: string; checked_in_at: string }[]>([]);
+  const [checkInsLoading, setCheckInsLoading] = useState(true);
+
+  const fetchCheckIns = useCallback(async () => {
+    if (!id || !isSignedIn) return;
+    try {
+      const { data, error } = await supabase
+        .from('check_ins')
+        .select('id, checked_in_at')
+        .eq('gym_member_id', id)
+        .order('checked_in_at', { ascending: false })
+        .limit(30);
+
+      if (error) {
+        console.error('[MemberDetail] Check-ins fetch error:', error);
+        return;
+      }
+      setCheckIns(data ?? []);
+    } catch (err) {
+      console.error('[MemberDetail] Unexpected check-ins error:', err);
+    } finally {
+      setCheckInsLoading(false);
+    }
+  }, [id, supabase, isSignedIn]);
+
+  useEffect(() => {
+    fetchCheckIns();
+  }, [fetchCheckIns]);
 
   const fetchMemberDetail = useCallback(async () => {
     // Skip while signed out. This screen stays mounted during sign-out, and
@@ -172,6 +203,7 @@ export default function MemberDetailScreen() {
     setRefreshing(true);
     fetchMemberDetail();
     refreshSubs();
+    fetchCheckIns();
   };
 
   const handleApprove = () => {
@@ -680,6 +712,56 @@ export default function MemberDetailScreen() {
             </Card>
           ))
         )}
+
+        {/* Attendance Section */}
+        <View style={styles.sectionHeader}>
+          <Text style={[styles.sectionTitle, { color: colors.text }]}>
+            Attendance
+          </Text>
+          <Text style={[styles.sectionSubtitle, { color: colors.textSecondary }]}>
+            {checkIns.length} check-ins
+          </Text>
+        </View>
+
+        {checkInsLoading ? (
+          <ActivityIndicator size="small" color={colors.primary} style={{ marginVertical: 20 }} />
+        ) : checkIns.length === 0 ? (
+          <Card padding={20}>
+            <View style={styles.emptySubs}>
+              <Ionicons name="calendar-outline" size={32} color={colors.textTertiary} />
+              <Text style={[styles.emptySubsText, { color: colors.textSecondary }]}>
+                No check-ins recorded yet.
+              </Text>
+            </View>
+          </Card>
+        ) : (
+          <Card padding={14}>
+            {checkIns.map((entry, index) => (
+              <View
+                key={entry.id}
+                style={[
+                  styles.checkInRow,
+                  index < checkIns.length - 1 && {
+                    borderBottomWidth: 1,
+                    borderBottomColor: colors.divider,
+                  },
+                ]}
+              >
+                <Ionicons name="checkmark-circle" size={18} color={colors.success} />
+                <Text style={[styles.checkInDate, { color: colors.text }]}>
+                  {formatDate(localDateOf(entry.checked_in_at))}
+                </Text>
+                <Text style={[styles.checkInTime, { color: colors.textSecondary }]}>
+                  {new Date(entry.checked_in_at).toLocaleTimeString('en-IN', {
+                    hour: 'numeric',
+                    minute: '2-digit',
+                    hour12: true,
+                  })}
+                </Text>
+              </View>
+            ))}
+          </Card>
+        )}
       </ScrollView>
 
       {/* Record Payment Modal */}
@@ -997,6 +1079,20 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   emptySubsText: {
+    fontSize: 13,
+  },
+  checkInRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingVertical: 10,
+  },
+  checkInDate: {
+    flex: 1,
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  checkInTime: {
     fontSize: 13,
   },
   subscriptionHistoryCard: {

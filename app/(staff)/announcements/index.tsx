@@ -63,7 +63,10 @@ export default function StaffAnnouncementsScreen() {
   };
 
   const renderAnnouncementItem = ({ item }: { item: (typeof announcements)[0] }) => {
-    const isAuthor = item.author?.full_name === profile?.full_name;
+    // Compare ids, not names: two staff sharing a full name would otherwise
+    // each see a delete button on the other's posts (the RLS delete policy is
+    // owner-only, so it would fail anyway — a dead affordance).
+    const isAuthor = !!profile?.id && item.author_id === profile.id;
     const targetBadgeText =
       item.target_audience === 'everyone'
         ? 'Everyone'

@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useSupabase } from './useSupabase';
 import { useAppAuth } from '../lib/auth';
+import { today, localDateOf, localDayRange } from '../utils/date';
 
 interface CheckIn {
   id: string;
@@ -42,9 +43,9 @@ export function useCheckIns(gymMemberId?: string) {
       setCheckIns(checkInData);
 
       // Check if there's a check-in today
-      const todayStr = new Date().toISOString().split('T')[0];
+      const todayStr = today();
       const todayEntry = checkInData.find(
-        (c) => c.checked_in_at.split('T')[0] === todayStr
+        (c) => localDateOf(c.checked_in_at) === todayStr
       );
       setTodayCheckIn(todayEntry ?? null);
     } catch (err) {
@@ -64,13 +65,13 @@ export function useCheckIns(gymMemberId?: string) {
       if (!gymId) throw new Error('No gym selected');
 
       // Validate the member hasn't already checked in today
-      const todayStr = new Date().toISOString().split('T')[0];
+      const { start, end } = localDayRange();
       const { data: existing } = await supabase
         .from('check_ins')
         .select('id')
         .eq('gym_member_id', memberId)
-        .gte('checked_in_at', `${todayStr}T00:00:00`)
-        .lte('checked_in_at', `${todayStr}T23:59:59`)
+        .gte('checked_in_at', start)
+        .lte('checked_in_at', end)
         .limit(1);
 
       if (existing && existing.length > 0) {
@@ -98,7 +99,7 @@ export function useCheckIns(gymMemberId?: string) {
   const fetchTodayAttendance = useCallback(async () => {
     if (!gymId) return [];
 
-    const todayStr = new Date().toISOString().split('T')[0];
+    const { start, end } = localDayRange();
 
     const { data, error } = await supabase
       .from('check_ins')
@@ -115,8 +116,8 @@ export function useCheckIns(gymMemberId?: string) {
         )
       `)
       .eq('gym_id', gymId)
-      .gte('checked_in_at', `${todayStr}T00:00:00`)
-      .lte('checked_in_at', `${todayStr}T23:59:59`)
+      .gte('checked_in_at', start)
+      .lte('checked_in_at', end)
       .order('checked_in_at', { ascending: false });
 
     if (error) {
@@ -129,7 +130,7 @@ export function useCheckIns(gymMemberId?: string) {
 
   // Get check-in dates for calendar view (YYYY-MM-DD strings)
   const getCheckInDates = useCallback((): string[] => {
-    return checkIns.map((c) => c.checked_in_at.split('T')[0]);
+    return checkIns.map((c) => localDateOf(c.checked_in_at));
   }, [checkIns]);
 
   return {

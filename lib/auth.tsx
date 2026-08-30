@@ -2,6 +2,7 @@ import React, { createContext, useContext, useEffect, useMemo, useRef, useState,
 import { useAuth as useClerkAuth, useUser } from '@clerk/expo';
 import { SupabaseClient } from '@supabase/supabase-js';
 import { createClerkSupabaseClient } from './supabase';
+import { registerPushToken, unregisterPushToken } from './notifications';
 
 // Types
 export type UserRole = 'owner' | 'staff' | 'member' | null;
@@ -28,6 +29,11 @@ export interface GymMembership {
   gym_id: string;
   role: UserRole;
   status: 'pending' | 'active' | 'expired' | 'rejected';
+  // Needed for time-slot announcement targeting. preferred_time_slot is the
+  // member's explicit choice; auto_time_slot is detected from check-in history
+  // by the trigger in migration 005.
+  preferred_time_slot: 'morning' | 'afternoon' | 'evening' | null;
+  auto_time_slot: 'morning' | 'afternoon' | 'evening' | null;
   gym: {
     id: string;
     name: string;
@@ -92,6 +98,39 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // Use the native Clerk session token — no JWT template needed
     return createClerkSupabaseClient(() => getTokenRef.current());
   }, []);
+
+  // Authorise the Realtime WebSocket separately from HTTP.
+  //
+  // createClerkSupabaseClient injects the Clerk token through `global.fetch`,
+  // which only covers REST calls — the Realtime socket never goes through it.
+  // Without setAuth the socket connects with just the anon key, and RLS on
+  // staff_chat_messages / announcements silently drops every row, so
+  // subscriptions appear connected but deliver nothing.
+  //
+  // Clerk session tokens are short-lived (~60s), so this refreshes on a timer;
+  // a stale socket token stops delivering events the same way a missing one does.
+  useEffect(() => {
+    if (!isSignedIn) return;
+
+    let cancelled = false;
+    const syncRealtimeAuth = async () => {
+      try {
+        const token = await getTokenRef.current();
+        if (!cancelled && token) {
+          supabase.realtime.setAuth(token);
+        }
+      } catch (err) {
+        console.warn('[Auth] Could not set realtime auth:', err);
+      }
+    };
+
+    syncRealtimeAuth();
+    const interval = setInterval(syncRealtimeAuth, 45_000);
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+    };
+  }, [isSignedIn, supabase]);
 
   // Check if profile has required fields filled.
   // `phone` is the marker that the user actually went through the
@@ -205,6 +244,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           gym_id,
           role,
           status,
+          preferred_time_slot,
+          auto_time_slot,
           gym:gyms (
             id,
             name,
@@ -238,8 +279,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   // effect below already clears everything once isSignedIn goes false, and
   // index.tsx checks !isSignedIn before it looks at the profile.
   const handleSignOut = useCallback(async () => {
+    // Remove this device's push token first — after signOut the Supabase
+    // client no longer has a token, so the delete would fail RLS.
+    await unregisterPushToken(supabase);
     await clerkSignOut();
-  }, [clerkSignOut]);
+  }, [clerkSignOut, supabase]);
 
   // Fetch profile when auth state changes
   useEffect(() => {
@@ -252,6 +296,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setMembershipFetchedFor(null);
     }
   }, [isLoaded, isSignedIn, refreshProfile]);
+
+  // Register this device for push once we know which profile it belongs to.
+  // Deliberately fire-and-forget: registerPushToken swallows the normal
+  // failure cases (emulator, Expo Go, permission declined) and returns null,
+  // and nothing in the app should block on notifications being available.
+  useEffect(() => {
+    if (!profile?.id) return;
+    registerPushToken(supabase, profile.id);
+  }, [profile?.id, supabase]);
 
   // Fetch membership when profile is loaded
   useEffect(() => {
