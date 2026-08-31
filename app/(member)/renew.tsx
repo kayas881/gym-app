@@ -45,6 +45,7 @@ export default function RenewMembershipScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [selectedPlan, setSelectedPlan] = useState<MembershipPlan | null>(null);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
+  const [submittingRequest, setSubmittingRequest] = useState(false);
 
   // Fetch gym's available membership plans
   const fetchPlans = useCallback(async () => {
@@ -82,11 +83,67 @@ export default function RenewMembershipScreen() {
   }, [refreshSub, fetchPlans]);
 
   const daysLeft = activeSubscription?.end_date ? daysRemaining(activeSubscription.end_date) : 0;
-  const expired = !activeSubscription?.end_date || isExpired(activeSubscription.end_date);
+  // Same distinction as the home screen: a member approved without a payment
+  // has no subscription yet but is NOT expired (see migration 003).
+  const expired = activeSubscription?.end_date
+    ? isExpired(activeSubscription.end_date)
+    : currentMembership?.status === 'expired';
+  const awaitingFirstPlan =
+    !activeSubscription?.end_date && currentMembership?.status === 'active';
 
   const handleSelectPlan = (plan: MembershipPlan) => {
     setSelectedPlan(plan);
     setShowPaymentModal(true);
+  };
+
+  // Records the request so the owner sees it, instead of only telling the
+  // member to pay at the desk. Writes to renewal_requests (member-insertable);
+  // `subscriptions` stays owner-only, so payment is still recorded by the owner.
+  const handleSubmitRequest = async () => {
+    if (!selectedPlan || !currentMembership?.id || !gymId) return;
+
+    setSubmittingRequest(true);
+    try {
+      // Clear any existing open request first, then insert the new choice.
+      //
+      // Not an upsert: the unique index is PARTIAL (WHERE status = 'pending'),
+      // and Postgres cannot match ON CONFLICT (gym_member_id) to a partial
+      // index unless the statement repeats that predicate — which PostgREST
+      // does not emit, so upsert fails with 42P10. The partial index is the
+      // right shape (a member may request again after one is approved), so the
+      // delete-then-insert happens here instead. Both are permitted by the
+      // member's own RLS policies.
+      const { error: clearError } = await supabase
+        .from('renewal_requests')
+        .delete()
+        .eq('gym_member_id', currentMembership.id)
+        .eq('status', 'pending');
+
+      if (clearError) throw clearError;
+
+      const { error } = await supabase.from('renewal_requests').insert({
+        gym_id: gymId,
+        gym_member_id: currentMembership.id,
+        plan_id: selectedPlan.id,
+        status: 'pending',
+      });
+
+      if (error) throw error;
+
+      setShowPaymentModal(false);
+      Alert.alert(
+        'Request Sent',
+        `${gymName} has been notified that you'd like the ${selectedPlan.name} plan. Pay at the counter to activate it.`
+      );
+    } catch (err: any) {
+      console.error('[Renew] Request failed:', err);
+      Alert.alert(
+        'Could Not Send Request',
+        err?.message || 'Please try again, or speak to gym staff.'
+      );
+    } finally {
+      setSubmittingRequest(false);
+    }
   };
 
   const gymName = currentMembership?.gym?.name || 'Your Gym';
@@ -372,14 +429,9 @@ export default function RenewMembershipScreen() {
 
                 {/* Action */}
                 <Button
-                  title="Got It"
-                  onPress={() => {
-                    setShowPaymentModal(false);
-                    Alert.alert(
-                      'Renewal Request Noted',
-                      'Please pay at the gym counter to activate your new plan.'
-                    );
-                  }}
+                  title="Send Request"
+                  onPress={handleSubmitRequest}
+                  loading={submittingRequest}
                   variant="primary"
                   size="lg"
                   fullWidth

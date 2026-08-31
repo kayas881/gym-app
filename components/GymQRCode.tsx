@@ -21,21 +21,54 @@ export function buildGymQrPayload(gymId: string, dateStr: string = today()): str
   return JSON.stringify({ gym_id: gymId, date: dateStr });
 }
 
+/**
+ * A code that never expires, for printing once and sticking on the wall.
+ *
+ * Omitting `date` is what makes it permanent: app/(member)/scan.tsx only
+ * enforces freshness when the payload carries a date, so the scanner needs no
+ * changes to support both modes.
+ *
+ * Trade-off, stated plainly: a member can screenshot this and "check in" from
+ * home. The daily code prevents that but has to be re-displayed or reprinted
+ * every day, which in a small gym usually means it stops happening at all.
+ * Since check-ins don't drive billing here, that's the owner's call to make.
+ */
+export function buildPermanentGymQrPayload(gymId: string): string {
+  return JSON.stringify({ gym_id: gymId });
+}
+
 interface GymQRCodeProps {
   gymId: string;
   gymName?: string | null;
   /** Rendered size of the QR square. */
   size?: number;
+  /**
+   * 'permanent' (default) can be printed once and left on the wall.
+   * 'daily' rotates and defeats screenshot re-use, but must be re-displayed
+   * every day — which is why it is not the default.
+   */
+  mode?: 'daily' | 'permanent';
 }
 
 /**
  * The scannable check-in code displayed at the gym counter.
  */
-export default function GymQRCode({ gymId, gymName, size = 240 }: GymQRCodeProps) {
+export default function GymQRCode({
+  gymId,
+  gymName,
+  size = 240,
+  mode = 'permanent',
+}: GymQRCodeProps) {
   const { colors } = useTheme();
   const todayStr = today();
 
-  const payload = useMemo(() => buildGymQrPayload(gymId, todayStr), [gymId, todayStr]);
+  const payload = useMemo(
+    () =>
+      mode === 'permanent'
+        ? buildPermanentGymQrPayload(gymId)
+        : buildGymQrPayload(gymId, todayStr),
+    [gymId, todayStr, mode]
+  );
 
   return (
     <View style={styles.container}>
@@ -52,7 +85,7 @@ export default function GymQRCode({ gymId, gymName, size = 240 }: GymQRCodeProps
         ) : null}
 
         <Text style={[styles.dateLabel, { color: colors.textSecondary }]}>
-          {formatDate(todayStr)}
+          {mode === 'permanent' ? 'Permanent check-in code' : formatDate(todayStr)}
         </Text>
 
         {/*
@@ -71,7 +104,9 @@ export default function GymQRCode({ gymId, gymName, size = 240 }: GymQRCodeProps
             style={styles.hintIcon}
           />
           <Text style={[styles.hintText, { color: colors.textTertiary }]}>
-            This code changes daily. Members scan it from the Check In tab.
+            {mode === 'permanent'
+              ? 'This code never expires — print it once and display it at the gym. Anyone who photographs it could check in remotely.'
+              : 'This code changes daily, so a screenshot will not work tomorrow. It has to be on display each day.'}
           </Text>
         </View>
       </View>

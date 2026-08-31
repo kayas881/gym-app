@@ -17,7 +17,7 @@ import { useSubscriptions } from '../../hooks/useSubscriptions';
 import { useCheckIns } from '../../hooks/useCheckIns';
 import { useAnnouncements } from '../../hooks/useAnnouncements';
 import { canViewAnnouncement } from '../../utils/announcement-audience';
-import { daysRemaining, formatDate, timeAgo, isExpired } from '../../utils/date';
+import { daysRemaining, formatDate, timeAgo, isExpired, today, localDateOf, daysFromToday } from '../../utils/date';
 import Card from '../../components/ui/Card';
 import Button from '../../components/ui/Button';
 import Avatar from '../../components/ui/Avatar';
@@ -72,9 +72,22 @@ export default function MemberHomeScreen() {
   }, [activeSubscription?.end_date]);
 
   const membershipExpired = useMemo(() => {
-    if (!activeSubscription?.end_date) return true;
+    // A member approved WITHOUT a payment is legitimately active with no
+    // subscription at all — migration 003 deliberately never expires them.
+    // Treating "no subscription" as expired showed them a permanent red
+    // "Membership Expired" banner despite being in good standing.
+    if (!activeSubscription?.end_date) {
+      return currentMembership?.status === 'expired';
+    }
     return isExpired(activeSubscription.end_date) || currentMembership?.status === 'expired';
   }, [activeSubscription?.end_date, currentMembership?.status]);
+
+  // Active, but the owner hasn't recorded a plan yet. Distinct from expired:
+  // there is nothing to count down, but nothing is wrong either.
+  const awaitingFirstPlan = useMemo(
+    () => !activeSubscription?.end_date && currentMembership?.status === 'active',
+    [activeSubscription?.end_date, currentMembership?.status]
+  );
 
   const planProgressPercent = useMemo(() => {
     if (!activeSubscription?.start_date || !activeSubscription?.end_date) return 0;
@@ -106,31 +119,32 @@ export default function MemberHomeScreen() {
   const currentStreak = useMemo(() => {
     if (!checkIns || checkIns.length === 0) return 0;
 
-    // Set of distinct YYYY-MM-DD check-in dates
+    // Distinct check-in days, in LOCAL time.
+    //
+    // `checked_in_at.split('T')[0]` and `toISOString().split('T')[0]` both read
+    // the UTC day: in IST a check-in before 05:30 local would be filed under the
+    // previous date, silently breaking the streak around midnight. localDateOf()
+    // and daysFromToday() do this correctly.
     const dateSet = new Set<string>();
     checkIns.forEach((c) => {
-      dateSet.add(c.checked_in_at.split('T')[0]);
+      dateSet.add(localDateOf(c.checked_in_at));
     });
 
-    const todayDate = new Date();
-    const todayStr = todayDate.toISOString().split('T')[0];
+    const todayStr = today();
+    const yesterdayStr = daysFromToday(-1);
 
-    const yesterday = new Date();
-    yesterday.setDate(yesterday.getDate() - 1);
-    const yesterdayStr = yesterday.toISOString().split('T')[0];
-
-    // Check if user checked in today or yesterday to start streak
+    // The streak is alive if they checked in today or yesterday.
     let cursor = new Date();
     if (!dateSet.has(todayStr)) {
       if (!dateSet.has(yesterdayStr)) {
         return 0; // Streak broken
       }
-      cursor = yesterday;
+      cursor.setDate(cursor.getDate() - 1);
     }
 
     let streak = 0;
     while (true) {
-      const cursorStr = cursor.toISOString().split('T')[0];
+      const cursorStr = localDateOf(cursor.toISOString());
       if (dateSet.has(cursorStr)) {
         streak++;
         cursor.setDate(cursor.getDate() - 1);
@@ -306,6 +320,51 @@ export default function MemberHomeScreen() {
                     />
                   </View>
                 </View>
+
+                {/*
+                  Renew is reachable from here, not only from the expired
+                  banner. Previously the ONLY link to /renew lived inside the
+                  `membershipExpired` branch, so a member could not renew until
+                  their membership had already lapsed — and a member approved
+                  without a payment could never reach it at all.
+                */}
+                <TouchableOpacity
+                  onPress={() => router.push('/(member)/renew')}
+                  activeOpacity={0.8}
+                  style={[
+                    styles.renewInlineButton,
+                    {
+                      borderColor: daysLeft <= 7 ? colors.warning : colors.border,
+                      backgroundColor:
+                        daysLeft <= 7 ? colors.primaryMuted : colors.surface,
+                    },
+                  ]}
+                >
+                  <Ionicons
+                    name="refresh-outline"
+                    size={18}
+                    color={daysLeft <= 7 ? colors.warning : colors.textSecondary}
+                  />
+                  <Text
+                    style={[
+                      styles.renewInlineText,
+                      {
+                        color: daysLeft <= 7 ? colors.warning : colors.text,
+                      },
+                    ]}
+                  >
+                    {awaitingFirstPlan
+                      ? 'Choose a plan'
+                      : daysLeft <= 7
+                        ? 'Renew now'
+                        : 'Renew or change plan'}
+                  </Text>
+                  <Ionicons
+                    name="chevron-forward"
+                    size={16}
+                    color={daysLeft <= 7 ? colors.warning : colors.textTertiary}
+                  />
+                </TouchableOpacity>
               </Card>
             )}
 
@@ -608,6 +667,17 @@ const styles = StyleSheet.create({
     height: '100%',
     borderRadius: 3,
   },
+  renewInlineButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginTop: 16,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    borderRadius: 12,
+    borderWidth: 1,
+  },
+  renewInlineText: { flex: 1, fontSize: 14, fontWeight: '600' },
   actionSection: {
     marginBottom: 20,
   },

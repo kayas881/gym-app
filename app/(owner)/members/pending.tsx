@@ -57,6 +57,69 @@ export default function PendingApprovalsScreen() {
   // Subscriptions hook for creating subscription
   const { createSubscription } = useSubscriptions();
 
+  // Open renewal requests (Phase 6 item 3).
+  //
+  // Surfaced here because this is the screen an owner already opens to act on
+  // requests. Previously the only place a request appeared was the member's own
+  // detail page, which assumes the owner already knows who asked.
+  const [renewalRequests, setRenewalRequests] = useState<any[]>([]);
+
+  const fetchRenewalRequests = useCallback(async () => {
+    if (!gymId) return;
+    try {
+      const { data, error } = await supabase
+        .from('renewal_requests')
+        .select(`
+          id,
+          created_at,
+          gym_member_id,
+          plan:membership_plans ( name, price, duration_months ),
+          member:gym_members ( id, profile:profiles ( full_name, photo_url ) )
+        `)
+        .eq('gym_id', gymId)
+        .eq('status', 'pending')
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        console.warn('[Pending] Renewal requests:', error.message);
+        return;
+      }
+      setRenewalRequests(data ?? []);
+    } catch (err) {
+      console.warn('[Pending] Renewal requests error:', err);
+    }
+  }, [gymId, supabase]);
+
+  useEffect(() => {
+    fetchRenewalRequests();
+  }, [fetchRenewalRequests]);
+
+  const handleRejectRenewal = (requestId: string, memberName: string) => {
+    Alert.alert(
+      'Reject Request',
+      `Dismiss ${memberName}'s renewal request? They can send another one.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Reject',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              const { error } = await supabase
+                .from('renewal_requests')
+                .update({ status: 'rejected' })
+                .eq('id', requestId);
+              if (error) throw error;
+              fetchRenewalRequests();
+            } catch (e: any) {
+              Alert.alert('Error', e.message || 'Could not reject the request.');
+            }
+          },
+        },
+      ]
+    );
+  };
+
   const fetchPlans = useCallback(async () => {
     if (!gymId) return;
     try {
@@ -234,10 +297,68 @@ export default function PendingApprovalsScreen() {
           contentContainerStyle={styles.listContent}
           showsVerticalScrollIndicator={false}
           ListEmptyComponent={renderEmptyState}
+          ListHeaderComponent={
+            renewalRequests.length > 0 ? (
+              <View style={styles.renewalSection}>
+                <Text style={[styles.renewalHeading, { color: colors.text }]}>
+                  Renewal Requests ({renewalRequests.length})
+                </Text>
+                {renewalRequests.map((req) => {
+                  const name = req.member?.profile?.full_name || 'Member';
+                  return (
+                    <Card key={req.id} style={styles.renewalCard} padding={14}>
+                      <View style={styles.renewalTopRow}>
+                        <Avatar
+                          uri={req.member?.profile?.photo_url}
+                          name={name}
+                          size={36}
+                        />
+                        <View style={styles.renewalInfo}>
+                          <Text style={[styles.renewalName, { color: colors.text }]}>
+                            {name}
+                          </Text>
+                          <Text style={[styles.renewalPlan, { color: colors.textSecondary }]}>
+                            {req.plan
+                              ? `${req.plan.name} — ₹${req.plan.price}`
+                              : 'Plan unavailable'}
+                            {'  ·  '}
+                            {timeAgo(req.created_at)}
+                          </Text>
+                        </View>
+                      </View>
+                      <View style={styles.renewalActions}>
+                        <Button
+                          title="Reject"
+                          variant="outline"
+                          size="sm"
+                          onPress={() => handleRejectRenewal(req.id, name)}
+                          style={styles.renewalBtn}
+                        />
+                        <Button
+                          title="Record Payment"
+                          variant="primary"
+                          size="sm"
+                          // The member detail screen owns the payment modal;
+                          // recording there closes this request automatically.
+                          onPress={() =>
+                            router.push(`/(owner)/members/${req.gym_member_id}`)
+                          }
+                          style={styles.renewalBtn}
+                        />
+                      </View>
+                    </Card>
+                  );
+                })}
+              </View>
+            ) : null
+          }
           refreshControl={
             <RefreshControl
               refreshing={loading}
-              onRefresh={refresh}
+              onRefresh={() => {
+                refresh();
+                fetchRenewalRequests();
+              }}
               tintColor={colors.primary}
               colors={[colors.primary]}
             />
@@ -532,6 +653,15 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     lineHeight: 20,
   },
+  renewalSection: { marginBottom: 20 },
+  renewalHeading: { fontSize: 16, fontWeight: '700', marginBottom: 10 },
+  renewalCard: { marginBottom: 10 },
+  renewalTopRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  renewalInfo: { flex: 1 },
+  renewalName: { fontSize: 15, fontWeight: '600' },
+  renewalPlan: { fontSize: 13, marginTop: 2 },
+  renewalActions: { flexDirection: 'row', gap: 10, marginTop: 12 },
+  renewalBtn: { flex: 1 },
   memberCard: {
     borderRadius: 16,
     marginBottom: 14,

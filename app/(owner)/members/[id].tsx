@@ -89,6 +89,36 @@ export default function MemberDetailScreen() {
   const [checkIns, setCheckIns] = useState<{ id: string; checked_in_at: string }[]>([]);
   const [checkInsLoading, setCheckInsLoading] = useState(true);
 
+  // Open renewal request, so the owner can see the member asked for a specific
+  // plan before recording a payment. record_subscription_payment closes it.
+  const [renewalRequest, setRenewalRequest] = useState<
+    { id: string; plan: { name: string; price: number; duration_months: number } | null } | null
+  >(null);
+
+  const fetchRenewalRequest = useCallback(async () => {
+    if (!id || !isSignedIn) return;
+    try {
+      const { data, error } = await supabase
+        .from('renewal_requests')
+        .select('id, plan:membership_plans ( name, price, duration_months )')
+        .eq('gym_member_id', id)
+        .eq('status', 'pending')
+        .maybeSingle();
+
+      if (error) {
+        console.warn('[MemberDetail] Renewal request fetch:', error.message);
+        return;
+      }
+      setRenewalRequest((data as any) ?? null);
+    } catch (err) {
+      console.warn('[MemberDetail] Renewal request error:', err);
+    }
+  }, [id, supabase, isSignedIn]);
+
+  useEffect(() => {
+    fetchRenewalRequest();
+  }, [fetchRenewalRequest]);
+
   const fetchCheckIns = useCallback(async () => {
     if (!id || !isSignedIn) return;
     try {
@@ -204,6 +234,7 @@ export default function MemberDetailScreen() {
     fetchMemberDetail();
     refreshSubs();
     fetchCheckIns();
+    fetchRenewalRequest();
   };
 
   const handleApprove = () => {
@@ -349,6 +380,9 @@ export default function MemberDetailScreen() {
       setPaymentModalVisible(false);
       fetchMemberDetail();
       refreshSubs();
+      // record_subscription_payment marks any open renewal request approved;
+      // refetch so the banner clears without needing a pull-to-refresh.
+      fetchRenewalRequest();
     } catch (e: any) {
       Alert.alert('Payment Error', e.message || 'Failed to record payment.');
     } finally {
@@ -653,6 +687,29 @@ export default function MemberDetailScreen() {
             </>
           ) : null}
         </Card>
+
+        {/* Open renewal request */}
+        {renewalRequest ? (
+          <View
+            style={[
+              styles.renewalBanner,
+              { backgroundColor: colors.primaryMuted, borderColor: colors.primary },
+            ]}
+          >
+            <Ionicons name="refresh-circle-outline" size={22} color={colors.primary} />
+            <View style={styles.renewalBannerText}>
+              <Text style={[styles.renewalBannerTitle, { color: colors.primary }]}>
+                Renewal requested
+              </Text>
+              <Text style={[styles.renewalBannerBody, { color: colors.textSecondary }]}>
+                {renewalRequest.plan
+                  ? `${renewalRequest.plan.name} — ₹${renewalRequest.plan.price}`
+                  : 'Plan no longer available'}
+                . Recording a payment will clear this request.
+              </Text>
+            </View>
+          </View>
+        ) : null}
 
         {/* Payment History Section */}
         <View style={styles.sectionHeader}>
@@ -1081,6 +1138,18 @@ const styles = StyleSheet.create({
   emptySubsText: {
     fontSize: 13,
   },
+  renewalBanner: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 10,
+    borderRadius: 12,
+    borderWidth: 1,
+    padding: 14,
+    marginTop: 16,
+  },
+  renewalBannerText: { flex: 1 },
+  renewalBannerTitle: { fontSize: 14, fontWeight: '700' },
+  renewalBannerBody: { fontSize: 13, lineHeight: 18, marginTop: 2 },
   checkInRow: {
     flexDirection: 'row',
     alignItems: 'center',

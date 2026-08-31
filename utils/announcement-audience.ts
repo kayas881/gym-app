@@ -42,17 +42,24 @@ function normalizeSlot(value?: string | null): TimeSlot | null {
 }
 
 /**
- * The time slot a member counts as, most explicit signal first.
+ * The time slot a member counts as: anything they explicitly chose first, then
+ * the slot inferred from check-ins as a fallback.
  *
- * `preferred_gym_timing` is free text, so it only counts when it happens to
- * literally name a slot — it can't be relied on alone, which is exactly why
- * auto_time_slot matters.
+ * Order matters. `autoTimeSlot` used to sit ahead of `preferredGymTiming`,
+ * which meant a member who explicitly picked "morning" but had a single evening
+ * check-in was targeted as evening — detection silently overrode an explicit
+ * preference. `preferredTimeSlot` is a gym_members column nothing currently
+ * writes; `preferredGymTiming` is what the profile screen actually saves, and
+ * being free text it simply matches nothing when it isn't a slot name.
+ *
+ * Mirrors the precedence in the announcement_recipients SQL function, so push
+ * targeting and the in-app feed agree.
  */
 export function resolveMemberTimeSlot(ctx: AudienceContext): TimeSlot | null {
   return (
     normalizeSlot(ctx.preferredTimeSlot) ??
-    normalizeSlot(ctx.autoTimeSlot) ??
-    normalizeSlot(ctx.preferredGymTiming)
+    normalizeSlot(ctx.preferredGymTiming) ??
+    normalizeSlot(ctx.autoTimeSlot)
   );
 }
 
