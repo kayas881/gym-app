@@ -72,6 +72,14 @@ export function canViewAnnouncement(
 ): boolean {
   const target = (targetAudience || 'everyone').trim().toLowerCase();
 
+  // 'everyone' means everyone still attached to the gym. A rejected applicant
+  // or a removed former member is not, and must not see the feed even though
+  // announcement_recipients() already excludes them from push — the two paths
+  // have to agree (that's the whole reason this module is shared).
+  if (ctx.membershipStatus === 'rejected' || ctx.membershipStatus === 'removed') {
+    return false;
+  }
+
   switch (target) {
     case 'everyone':
       return true;

@@ -28,6 +28,7 @@ export interface InputProps {
   autoCorrect?: boolean;
   multiline?: boolean;
   numberOfLines?: number;
+  maxLength?: number;
   style?: StyleProp<ViewStyle>;
   inputStyle?: StyleProp<TextStyle>;
   editable?: boolean;
@@ -52,6 +53,7 @@ export default function Input({
   autoCorrect = true,
   multiline = false,
   numberOfLines = 1,
+  maxLength,
   style,
   inputStyle,
   editable = true,
@@ -119,6 +121,7 @@ export default function Input({
           autoCorrect={autoCorrect}
           multiline={multiline}
           numberOfLines={numberOfLines}
+          maxLength={maxLength}
           editable={editable}
           onFocus={handleFocus}
           onBlur={handleBlur}

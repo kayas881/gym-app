@@ -1,0 +1,45 @@
+-- ============================================================================
+-- Migration: 035_revert_announcement_trigger.sql
+-- Date: 2026-09-01
+-- Description: Remove the announcement push trigger added in 031. The
+--              notify-announcement Edge Function was already doing this, and
+--              does it better.
+-- ============================================================================
+--
+-- Migration 031 added trg_announcement_notify on the belief that announcements
+-- notified nobody. That was wrong: hooks/useAnnouncements.ts had always invoked
+-- a deployed Edge Function, `notify-announcement`, after inserting. Its source
+-- simply was not in the repo, and supabase/functions was empty, so the check
+-- missed it. Running both paths sent every announcement TWICE, which is the bug
+-- that showed up on device.
+--
+-- Reverting the trigger rather than deleting the function, because the function
+-- is the stronger implementation of the two:
+--
+--   * It reads Expo's tickets and DELETES any token that comes back
+--     DeviceNotRegistered. That is the proper fix for stale tokens -- the exact
+--     thing migration 033 had to work around with a pruning trigger, and which
+--     the comment there called impossible from SQL.
+--   * It batches at 100 messages, which is Expo's per-request limit.
+--     send_push_to_profiles builds ONE request for every token, so this trigger
+--     would have started silently failing once a gym passed 100 devices.
+--   * It claims notified_at atomically (`.is('notified_at', null)`) before
+--     sending, so two concurrent invocations cannot both notify.
+--
+-- The trigger's only advantage was firing however the row was created rather
+-- than only from that hook. The app is the sole writer of announcements, so that
+-- is theoretical, and it does not outweigh losing dead-token pruning and
+-- batching.
+--
+-- The real defect behind all of this -- the function not being version
+-- controlled -- is fixed separately: its source is now committed at
+-- supabase/functions/notify-announcement/index.ts, so it can be reviewed and
+-- redeployed onto a fresh gym instance with `supabase functions deploy`.
+--
+-- KEPT from the meantime: migration 034's `tag` on send_push_to_profiles still
+-- applies to the other five notification types, and the Edge Function now sets
+-- the matching tag itself.
+-- ============================================================================
+
+DROP TRIGGER IF EXISTS trg_announcement_notify ON public.announcements;
+DROP FUNCTION IF EXISTS public.notify_new_announcement();

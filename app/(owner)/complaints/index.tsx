@@ -16,7 +16,7 @@ import { useComplaints } from '../../../hooks/useComplaints';
 import Card from '../../../components/ui/Card';
 import Avatar from '../../../components/ui/Avatar';
 import Badge, { BadgeVariant } from '../../../components/ui/Badge';
-import { formatDateTime, timeAgo } from '../../../utils/date';
+import { timestampLabel } from '../../../utils/date';
 
 type FilterTab = 'all' | 'new' | 'acknowledged' | 'resolved';
 
@@ -101,7 +101,7 @@ export default function OwnerComplaintsListScreen() {
                 {memberName}
               </Text>
               <Text style={[styles.timeText, { color: colors.textTertiary }]}>
-                {timeAgo(item.created_at)} • {formatDateTime(item.created_at)}
+                {timestampLabel(item.created_at)}
               </Text>
             </View>
           </View>

@@ -19,6 +19,8 @@ export interface MemberListItemProps {
   status: MemberStatus;
   role: MemberRole;
   subtitle?: string;
+  /** Member has an open renewal request waiting on the owner. */
+  hasRenewalRequest?: boolean;
   onPress?: () => void;
   style?: StyleProp<ViewStyle>;
 }
@@ -29,6 +31,7 @@ export default function MemberListItem({
   status,
   role,
   subtitle,
+  hasRenewalRequest = false,
   onPress,
   style,
 }: MemberListItemProps) {
@@ -107,6 +110,21 @@ export default function MemberListItem({
                 {formatRoleName(role)}
               </Text>
             </View>
+
+            {/* So the owner can see who is waiting while scrolling the list,
+                instead of having to open each profile to find out. */}
+            {hasRenewalRequest ? (
+              <View
+                style={[
+                  styles.renewalBadge,
+                  {
+                    backgroundColor: isDark ? 'rgba(0, 230, 118, 0.16)' : 'rgba(0, 200, 83, 0.12)',
+                  },
+                ]}
+              >
+                <Text style={[styles.renewalText, { color: colors.primary }]}>RENEWAL</Text>
+              </View>
+            ) : null}
           </View>
 
           {subtitle ? (
@@ -128,6 +146,16 @@ export default function MemberListItem({
 }
 
 const styles = StyleSheet.create({
+  renewalBadge: {
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+    borderRadius: 6,
+  },
+  renewalText: {
+    fontSize: 9,
+    fontWeight: '800',
+    letterSpacing: 0.4,
+  },
   container: {
     flexDirection: 'row',
     alignItems: 'center',

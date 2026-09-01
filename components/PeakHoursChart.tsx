@@ -98,6 +98,12 @@ export default function PeakHoursChart({ daysBack = 30 }: PeakHoursChartProps) {
     };
   }, [rows]);
 
+  // chart-kit renders 4 y-axis segments by default. With a max of 1 check-in
+  // that produced duplicate labels ("1 1 1 0 0"), so scale the segment count
+  // to the data instead.
+  const maxValue = Math.max(...values, 0);
+  const segments = Math.max(1, Math.min(4, maxValue));
+
   const chartConfig = {
     backgroundGradientFrom: colors.surface,
     backgroundGradientTo: colors.surface,
@@ -152,6 +158,7 @@ export default function PeakHoursChart({ daysBack = 30 }: PeakHoursChartProps) {
             width={labels.length * BAR_WIDTH + 60}
             height={200}
             fromZero
+            segments={segments}
             showValuesOnTopOfBars
             withInnerLines
             yAxisLabel=""

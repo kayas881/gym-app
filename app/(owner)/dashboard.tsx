@@ -10,7 +10,7 @@ import {
   StyleSheet,
   ActivityIndicator,
 } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useRouter, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useAppAuth } from '../../lib/auth';
 import { useTheme } from '../../lib/theme';
@@ -28,6 +28,7 @@ import { useComplaints } from '../../hooks/useComplaints';
 interface DashboardStats {
   activeMembers: number;
   pendingApprovals: number;
+  pendingRenewals: number;
   revenueThisMonth: number;
   expiringSoon: number;
 }
@@ -52,6 +53,7 @@ export default function OwnerDashboardScreen() {
   const [stats, setStats] = useState<DashboardStats>({
     activeMembers: 0,
     pendingApprovals: 0,
+    pendingRenewals: 0,
     revenueThisMonth: 0,
     expiringSoon: 0,
   });
@@ -88,10 +90,13 @@ export default function OwnerDashboardScreen() {
       }
 
       // 1. Fetch gym member counts
+      // role='member' matters: the owner and every staff member also have a
+      // gym_members row, so without it a gym with 2 real members reported 4.
       const { count: activeCount, error: activeError } = await supabase
         .from('gym_members')
         .select('*', { count: 'exact', head: true })
         .eq('gym_id', gymId)
+        .eq('role', 'member')
         .eq('status', 'active');
 
       if (activeError) console.error('[Dashboard] Active count error:', activeError);
@@ -103,6 +108,17 @@ export default function OwnerDashboardScreen() {
         .eq('status', 'pending');
 
       if (pendingError) console.error('[Dashboard] Pending count error:', pendingError);
+
+      // Open renewal requests. Until this existed the ONLY in-app signal was
+      // a banner inside the member's own profile screen, so the owner had to
+      // already know who had asked in order to find out that they had asked.
+      const { count: renewalCount, error: renewalError } = await supabase
+        .from('renewal_requests')
+        .select('*', { count: 'exact', head: true })
+        .eq('gym_id', gymId)
+        .eq('status', 'pending');
+
+      if (renewalError) console.error('[Dashboard] Renewal count error:', renewalError);
 
       // Get all member IDs for this gym to query subscriptions
       const { data: memberRows, error: memberRowsError } = await supabase
@@ -143,24 +159,41 @@ export default function OwnerDashboardScreen() {
         const todayStr = today();
         const next7DaysStr = daysFromToday(7);
 
-        const { count: expCount, error: expError } = await supabase
+        // Counted per MEMBER, over their latest end date — not per subscription.
+        // Since migration 024 an early renewal leaves two 'active' rows, so a
+        // member paid up to March still has a row ending 30 Nov. A row-level
+        // count would have put them in "Expiring in 7 days" on 23 Nov and told
+        // the owner to chase somebody who had already paid.
+        const { data: activeSubRows, error: expError } = await supabase
           .from('subscriptions')
-          .select('*', { count: 'exact', head: true })
+          .select('gym_member_id, end_date')
           .in('gym_member_id', memberIds)
-          .eq('status', 'active')
-          .gte('end_date', todayStr)
-          .lte('end_date', next7DaysStr);
+          .eq('status', 'active');
 
         if (expError) {
           console.error('[Dashboard] Expiring count error:', expError);
         } else {
-          expiringSoonCount = expCount || 0;
+          const latestEndByMember = new Map<string, string>();
+          for (const row of (activeSubRows || []) as {
+            gym_member_id: string;
+            end_date: string;
+          }[]) {
+            const current = latestEndByMember.get(row.gym_member_id);
+            if (!current || row.end_date > current) {
+              latestEndByMember.set(row.gym_member_id, row.end_date);
+            }
+          }
+
+          expiringSoonCount = [...latestEndByMember.values()].filter(
+            (end) => end >= todayStr && end <= next7DaysStr
+          ).length;
         }
       }
 
       setStats({
         activeMembers: activeCount || 0,
         pendingApprovals: pendingCount || 0,
+        pendingRenewals: renewalCount || 0,
         revenueThisMonth,
         expiringSoon: expiringSoonCount,
       });
@@ -206,6 +239,15 @@ export default function OwnerDashboardScreen() {
   useEffect(() => {
     fetchDashboardData();
   }, [fetchDashboardData]);
+
+  // The dashboard is a mounted tab, so it kept showing stale counts after the
+  // owner acted elsewhere — most visibly the renewal-request banner, which
+  // would still be up after the payment that cleared the request.
+  useFocusEffect(
+    useCallback(() => {
+      fetchDashboardData();
+    }, [fetchDashboardData])
+  );
 
   const onRefresh = () => {
     setRefreshing(true);
@@ -294,21 +336,50 @@ export default function OwnerDashboardScreen() {
           </View>
         ) : (
           <>
+            {/* Renewal requests need their own row rather than a number in the
+                Pending card: they are the one thing on this screen that costs
+                the owner money to ignore. */}
+            {stats.pendingRenewals > 0 ? (
+              <TouchableOpacity
+                onPress={() => router.push('/(owner)/members/pending')}
+                activeOpacity={0.8}
+                style={[
+                  styles.renewalAlert,
+                  { backgroundColor: colors.primaryMuted, borderColor: colors.primary },
+                ]}
+              >
+                <View style={[styles.renewalAlertIcon, { backgroundColor: colors.primary }]}>
+                  <Ionicons name="refresh" size={20} color="#000000" />
+                </View>
+                <View style={styles.renewalAlertText}>
+                  <Text style={[styles.renewalAlertTitle, { color: colors.text }]}>
+                    {stats.pendingRenewals}{' '}
+                    {stats.pendingRenewals === 1 ? 'renewal request' : 'renewal requests'}
+                  </Text>
+                  <Text style={[styles.renewalAlertBody, { color: colors.textSecondary }]}>
+                    {stats.pendingRenewals === 1 ? 'A member wants' : 'Members want'} to renew —
+                    tap to review and take payment
+                  </Text>
+                </View>
+                <Ionicons name="chevron-forward" size={20} color={colors.primary} />
+              </TouchableOpacity>
+            ) : null}
+
             {/* Stat Cards Grid */}
             <View style={styles.statsSection}>
               <View style={styles.statsRow}>
                 <StatCard
-                  title="Active Members"
+                  title="Members"
                   value={stats.activeMembers}
-                  subtitle="Enrolled members"
+                  subtitle="Active, paying"
                   icon="people-outline"
                   color={colors.statusActive}
-                  onPress={() => router.push('/(owner)/members')}
+                  onPress={() => router.push('/(owner)/members?status=active')}
                   style={styles.statCardHalf}
                 />
 
                 <StatCard
-                  title="Pending Approvals"
+                  title="Pending"
                   value={stats.pendingApprovals}
                   subtitle={stats.pendingApprovals > 0 ? 'Action required' : 'All clear'}
                   icon="time-outline"
@@ -320,22 +391,25 @@ export default function OwnerDashboardScreen() {
 
               <View style={styles.statsRow}>
                 <StatCard
-                  title="Revenue This Month"
+                  title="Revenue"
                   value={`₹${stats.revenueThisMonth.toLocaleString('en-IN')}`}
-                  subtitle="Total collections"
+                  subtitle="This month"
                   icon="cash-outline"
                   color={colors.info}
-                  onPress={() => router.push('/(owner)/members')}
+                  // Revenue belongs in payment history, not the member list.
+                  onPress={() => router.push('/(owner)/payments')}
                   style={styles.statCardHalf}
                 />
 
                 <StatCard
-                  title="Expiring Soon"
+                  title="Expiring"
                   value={stats.expiringSoon}
                   subtitle="Within 7 days"
                   icon="alert-circle-outline"
                   color={colors.statusExpired}
-                  onPress={() => router.push('/(owner)/members')}
+                  // Goes to the derived "Expiring" filter — those members are
+                  // still 'active', so the Expired tab would be empty.
+                  onPress={() => router.push('/(owner)/members?status=expiring')}
                   style={styles.statCardHalf}
                 />
               </View>
@@ -354,7 +428,10 @@ export default function OwnerDashboardScreen() {
                   styles.quickActionButton,
                   { backgroundColor: colors.surface, borderColor: colors.border },
                 ]}
-                onPress={() => router.push('/(owner)/members')}
+                // The record-payment screen has its own "Select Member" step,
+                // so send the owner straight there rather than dumping them on
+                // the member list with no explanation of what to do next.
+                onPress={() => router.push('/(owner)/payments/record')}
                 activeOpacity={0.7}
               >
                 <View style={[styles.quickActionIconCircle, { backgroundColor: isDark ? 'rgba(0, 230, 118, 0.15)' : 'rgba(0, 200, 83, 0.12)' }]}>
@@ -732,16 +809,19 @@ export default function OwnerDashboardScreen() {
                               style={styles.actionBtnHalf}
                             />
                           )}
+                          {/* Resolving is the last thing the member hears about
+                              the issue, so it has to carry a reply. This used to
+                              resolve in place with no response, which left every
+                              resolved complaint blank on the member's side. The
+                              reply box lives on the detail screen and requires
+                              text before it will save. */}
                           <Button
-                            title="Mark Resolved"
+                            title="Resolve & Reply"
                             variant="primary"
                             size="sm"
-                            onPress={async () => {
-                              try {
-                                await updateComplaintStatus(c.id, 'resolved');
-                              } catch (e: any) {
-                                Alert.alert('Error', e.message);
-                              }
+                            onPress={() => {
+                              setComplaintsModalVisible(false);
+                              router.push(`/(owner)/complaints/${c.id}`);
                             }}
                             style={styles.actionBtnHalf}
                           />
@@ -795,6 +875,25 @@ export default function OwnerDashboardScreen() {
 }
 
 const styles = StyleSheet.create({
+  renewalAlert: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    borderWidth: 1,
+    borderRadius: 14,
+    padding: 14,
+    marginBottom: 16,
+  },
+  renewalAlertIcon: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  renewalAlertText: { flex: 1 },
+  renewalAlertTitle: { fontSize: 15, fontWeight: '700' },
+  renewalAlertBody: { fontSize: 12, lineHeight: 17, marginTop: 2 },
   viewAllComplaints: {
     flexDirection: 'row',
     alignItems: 'center',

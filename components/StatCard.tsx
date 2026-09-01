@@ -53,10 +53,16 @@ export default function StatCard({
     }).start();
   };
 
+  // `style` (which carries the caller's flex:1) is applied to the OUTERMOST
+  // element below, not here. When onPress is set the card is wrapped in
+  // Animated.View > Pressable, and putting flex on the inner view left the
+  // wrapper sizing to its content — so cards in a row came out different
+  // widths depending on how long their titles were.
   const cardContent = (
     <View
       style={[
         styles.container,
+        styles.fill,
         {
           backgroundColor: colors.card,
           borderColor: colors.border,
@@ -64,7 +70,6 @@ export default function StatCard({
           borderLeftWidth: 4,
           shadowColor: colors.shadow,
         },
-        style,
       ]}
     >
       <View style={styles.headerRow}>
@@ -120,12 +125,12 @@ export default function StatCard({
 
   if (onPress) {
     return (
-      <Animated.View style={{ transform: [{ scale: scaleAnim }] }}>
+      <Animated.View style={[style, { transform: [{ scale: scaleAnim }] }]}>
         <Pressable
           onPress={onPress}
           onPressIn={handlePressIn}
           onPressOut={handlePressOut}
-          style={({ pressed }) => [pressed && styles.pressed]}
+          style={({ pressed }) => [styles.fill, pressed && styles.pressed]}
         >
           {cardContent}
         </Pressable>
@@ -133,10 +138,12 @@ export default function StatCard({
     );
   }
 
-  return cardContent;
+  // Non-pressable branch needs the caller's layout style too.
+  return <View style={style}>{cardContent}</View>;
 }
 
 const styles = StyleSheet.create({
+  fill: { flex: 1 },
   container: {
     borderRadius: 16,
     borderWidth: 1,

@@ -21,6 +21,7 @@ import Card from '../../../components/ui/Card';
 import Badge from '../../../components/ui/Badge';
 import Button from '../../../components/ui/Button';
 import Avatar from '../../../components/ui/Avatar';
+import { planDurationSuffix } from '../../../utils/plan-label';
 import { formatDate, formatDateTime } from '../../../utils/date';
 import { generateReceiptHTML } from '../../../utils/receipt-template';
 
@@ -219,7 +220,9 @@ export default function OwnerPaymentsScreen() {
     const memberName = item.gym_member?.profile?.full_name || 'Unknown Member';
     const photoUrl = item.gym_member?.profile?.photo_url;
     const planName = item.plan?.name || 'Membership Plan';
-    const duration = item.plan?.duration_months ? `${item.plan.duration_months} mo` : '';
+    // Plan names usually already state the term ("3 Months"), which rendered as
+    // "3 Months • 3 mo". The shared helper decides when the suffix adds anything.
+    const duration = planDurationSuffix(planName, item.plan?.duration_months);
 
     return (
       <Card

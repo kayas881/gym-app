@@ -28,7 +28,7 @@ export interface GymMembership {
   id: string;
   gym_id: string;
   role: UserRole;
-  status: 'pending' | 'active' | 'expired' | 'rejected';
+  status: 'pending' | 'active' | 'expired' | 'rejected' | 'removed';
   // Needed for time-slot announcement targeting. preferred_time_slot is the
   // member's explicit choice; auto_time_slot is detected from check-in history
   // by the trigger in migration 005.
@@ -253,7 +253,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           )
         `)
         .eq('profile_id', profile.id)
-        .in('status', ['active', 'pending'])
+        // 'expired' has to be here. (member)/home.tsx has a whole "Your
+        // membership has expired" banner with a Renew button keyed off this
+        // status, and it was dead code: excluding 'expired' made
+        // currentMembership null, so index.tsx sent a lapsed member to
+        // setup-gym and asked them to join a gym they were already in.
+        // 'rejected' and 'removed' stay excluded — those users are no longer
+        // attached to the gym.
+        .in('status', ['active', 'pending', 'expired'])
         .order('joined_at', { ascending: false })
         .limit(1)
         .maybeSingle();

@@ -11,7 +11,12 @@ export const CLERK_PUBLISHABLE_KEY = 'pk_test_aG9wZWZ1bC1sZW11ci00NTEwLmNsZXJrLm
 export const TIME_SLOTS = {
   morning: { start: 5, end: 11 },    // 5:00 AM - 10:59 AM
   afternoon: { start: 11, end: 16 },  // 11:00 AM - 3:59 PM
-  evening: { start: 16, end: 21 },    // 4:00 PM - 8:59 PM
+  // The gym trades until 22:00, so an evening slot ending at 21 left every
+  // 9-10pm check-in belonging to no slot at all: it never counted towards the
+  // member's auto_time_slot, and a member who only trains then was silently
+  // dropped from evening-targeted announcements. Kept in step with
+  // announcement_recipients() in migration 026.
+  evening: { start: 16, end: 22 },    // 4:00 PM - 9:59 PM
 } as const;
 
 export type TimeSlot = keyof typeof TIME_SLOTS;

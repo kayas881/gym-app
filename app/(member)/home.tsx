@@ -23,6 +23,7 @@ import Button from '../../components/ui/Button';
 import Avatar from '../../components/ui/Avatar';
 import Badge from '../../components/ui/Badge';
 import StatCard from '../../components/StatCard';
+import { useToday } from '../../hooks/useToday';
 
 export default function MemberHomeScreen() {
   const router = useRouter();
@@ -32,6 +33,8 @@ export default function MemberHomeScreen() {
 
   const {
     activeSubscription,
+    upcomingSubscription,
+    coverageEndDate,
     loading: subscriptionLoading,
     refresh: refreshSubscription,
   } = useSubscriptions(currentMembership?.id);
@@ -65,22 +68,37 @@ export default function MemberHomeScreen() {
     setRefreshing(false);
   }, [refreshSubscription, refreshCheckIns, refreshAnnouncements]);
 
+  // Every memo below that reads the clock takes this as a dependency. Without
+  // it they are keyed only on data that does not change at midnight, so the
+  // numbers froze at whatever the first render produced -- and a tab screen
+  // stays mounted for as long as the app is open.
+  const todayKey = useToday();
+
   // Calculate days remaining & progress
+  // Counts to the last covered day across every paid period, not to the end of
+  // the current one. A member who renewed early is covered past
+  // activeSubscription.end_date, and telling them "91 days left" when they
+  // have paid through March would read as losing the renewal.
   const daysLeft = useMemo(() => {
-    if (!activeSubscription?.end_date) return 0;
-    return daysRemaining(activeSubscription.end_date);
-  }, [activeSubscription?.end_date]);
+    const end = coverageEndDate ?? activeSubscription?.end_date;
+    if (!end) return 0;
+    return daysRemaining(end);
+  }, [coverageEndDate, activeSubscription?.end_date, todayKey]);
 
   const membershipExpired = useMemo(() => {
     // A member approved WITHOUT a payment is legitimately active with no
     // subscription at all — migration 003 deliberately never expires them.
     // Treating "no subscription" as expired showed them a permanent red
     // "Membership Expired" banner despite being in good standing.
-    if (!activeSubscription?.end_date) {
+    const end = coverageEndDate ?? activeSubscription?.end_date;
+    if (!end) {
       return currentMembership?.status === 'expired';
     }
-    return isExpired(activeSubscription.end_date) || currentMembership?.status === 'expired';
-  }, [activeSubscription?.end_date, currentMembership?.status]);
+    // Coverage, not the current period: otherwise the day the first period
+    // ends the member is told they have expired while their renewal is
+    // already paid for and starting tomorrow.
+    return isExpired(end) || currentMembership?.status === 'expired';
+  }, [coverageEndDate, activeSubscription?.end_date, currentMembership?.status, todayKey]);
 
   // Active, but the owner hasn't recorded a plan yet. Distinct from expired:
   // there is nothing to count down, but nothing is wrong either.
@@ -89,6 +107,9 @@ export default function MemberHomeScreen() {
     [activeSubscription?.end_date, currentMembership?.status]
   );
 
+  // Deliberately measured over the CURRENT period, matching the dates printed
+  // directly above the bar. Measuring it over total coverage would show a bar
+  // that disagrees with its own caption.
   const planProgressPercent = useMemo(() => {
     if (!activeSubscription?.start_date || !activeSubscription?.end_date) return 0;
     const start = new Date(activeSubscription.start_date).getTime();
@@ -113,7 +134,7 @@ export default function MemberHomeScreen() {
       const d = new Date(c.checked_in_at);
       return d.getFullYear() === currentYear && d.getMonth() === currentMonth;
     }).length;
-  }, [checkIns]);
+  }, [checkIns, todayKey]);
 
   // Calculate current streak in consecutive days
   const currentStreak = useMemo(() => {
@@ -154,7 +175,7 @@ export default function MemberHomeScreen() {
     }
 
     return streak;
-  }, [checkIns]);
+  }, [checkIns, todayKey]);
 
   // Announcements preview (filtered and limited to 2-3)
   const recentAnnouncements = useMemo(() => {
@@ -196,9 +217,16 @@ export default function MemberHomeScreen() {
             <Text style={[styles.greetingText, { color: colors.text }]}>
               Welcome back, {memberFirstName} 👋
             </Text>
-            <Text style={[styles.gymSubTitle, { color: colors.primary }]}>
-              {gymName}
-            </Text>
+            <TouchableOpacity
+              onPress={() => router.push('/(member)/gym-info')}
+              activeOpacity={0.7}
+              style={styles.gymNameRow}
+            >
+              <Text style={[styles.gymSubTitle, { color: colors.primary }]}>
+                {gymName}
+              </Text>
+              <Ionicons name="chevron-forward" size={14} color={colors.primary} />
+            </TouchableOpacity>
           </View>
           <TouchableOpacity
             onPress={() => router.push('/(member)/profile')}
@@ -272,6 +300,16 @@ export default function MemberHomeScreen() {
                       {formatDate(activeSubscription?.start_date || '')} –{' '}
                       {formatDate(activeSubscription?.end_date || '')}
                     </Text>
+
+                    {/* Without this the card shows a period ending 30 Nov while
+                        the counter says 182 days, and the two look like a
+                        contradiction rather than "you already renewed". */}
+                    {upcomingSubscription ? (
+                      <Text style={[styles.renewedLine, { color: colors.primary }]}>
+                        Renewed · {upcomingSubscription.plan?.name || 'Next plan'} continues to{' '}
+                        {formatDate(upcomingSubscription.end_date)}
+                      </Text>
+                    ) : null}
                   </View>
 
                   {/* Circular Days Counter */}
@@ -284,11 +322,14 @@ export default function MemberHomeScreen() {
                       },
                     ]}
                   >
+                    {/* end_date is inclusive, so daysLeft is 0 on the final day
+                        while the membership is still valid. "0 days left" reads
+                        like it has already lapsed. */}
                     <Text style={[styles.countdownNumber, { color: colors.primary }]}>
-                      {daysLeft}
+                      {daysLeft === 0 ? 'Last' : daysLeft}
                     </Text>
                     <Text style={[styles.countdownLabel, { color: colors.textSecondary }]}>
-                      days left
+                      {daysLeft === 0 ? 'day today' : daysLeft === 1 ? 'day left' : 'days left'}
                     </Text>
                   </View>
                 </View>
@@ -370,7 +411,22 @@ export default function MemberHomeScreen() {
 
             {/* Check In Action Button */}
             <View style={styles.actionSection}>
-              {hasCheckedInToday ? (
+              {/* The check_ins insert policy requires gym_members.status =
+                  'active' (001_initial_schema.sql), so offering the scanner to
+                  a lapsed member sends them to the camera only to fail on RLS
+                  with a permission error they cannot act on. Send them to
+                  Renew instead. */}
+              {membershipExpired ? (
+                <Button
+                  title="Renew to Check In"
+                  onPress={() => router.push('/(member)/renew')}
+                  variant="primary"
+                  size="lg"
+                  fullWidth
+                  icon={<Ionicons name="refresh-outline" size={22} color="#000000" />}
+                  style={styles.checkInButton}
+                />
+              ) : hasCheckedInToday ? (
                 <View
                   style={[
                     styles.checkedInBanner,
@@ -410,13 +466,16 @@ export default function MemberHomeScreen() {
                   onPress={() => router.push('/(member)/attendance')}
                   style={styles.statCardHalf}
                 />
+                {/* No onPress: there is no streak screen, so this used to be a
+                    third tap-target landing on Attendance History. Left as a
+                    read-only stat rather than a link that repeats its
+                    neighbour. */}
                 <StatCard
                   title="Current Streak"
                   value={`${currentStreak} ${currentStreak === 1 ? 'Day' : 'Days'}`}
                   subtitle={currentStreak > 0 ? '🔥 On a roll!' : 'Start your streak'}
                   icon="flame-outline"
                   color={colors.warning}
-                  onPress={() => router.push('/(member)/attendance')}
                   style={styles.statCardHalf}
                 />
               </View>
@@ -429,13 +488,13 @@ export default function MemberHomeScreen() {
                   styles.quickNavCard,
                   { backgroundColor: colors.card, borderColor: colors.border },
                 ]}
-                onPress={() => router.push('/(member)/attendance')}
+                onPress={() => router.push('/(member)/gym-info')}
                 activeOpacity={0.7}
               >
                 <View style={[styles.quickNavIconWrap, { backgroundColor: isDark ? 'rgba(68, 138, 255, 0.15)' : '#E3F2FD' }]}>
-                  <Ionicons name="calendar" size={20} color={colors.info} />
+                  <Ionicons name="business" size={20} color={colors.info} />
                 </View>
-                <Text style={[styles.quickNavText, { color: colors.text }]}>Attendance</Text>
+                <Text style={[styles.quickNavText, { color: colors.text }]}>My Gym</Text>
               </TouchableOpacity>
 
               <TouchableOpacity
@@ -551,6 +610,7 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     letterSpacing: -0.4,
   },
+  gymNameRow: { flexDirection: 'row', alignItems: 'center', gap: 2 },
   gymSubTitle: {
     fontSize: 14,
     fontWeight: '700',
@@ -593,6 +653,12 @@ const styles = StyleSheet.create({
   expiredSub: {
     fontSize: 13,
     lineHeight: 18,
+  },
+  renewedLine: {
+    fontSize: 12,
+    fontWeight: '600',
+    marginTop: 6,
+    lineHeight: 17,
   },
   renewButton: {
     height: 44,

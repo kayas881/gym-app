@@ -15,7 +15,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAppAuth } from '../../lib/auth';
 import { useTheme } from '../../lib/theme';
 import { useMembers } from '../../hooks/useMembers';
-import { formatDate } from '../../utils/date';
+import { daysRemaining, formatDate, today } from '../../utils/date';
 import MemberListItem from '../../components/MemberListItem';
 import Input from '../../components/ui/Input';
 import Avatar from '../../components/ui/Avatar';
@@ -23,7 +23,21 @@ import StatusBadge from '../../components/ui/StatusBadge';
 import Badge from '../../components/ui/Badge';
 import Button from '../../components/ui/Button';
 
-type FilterStatus = 'all' | 'active' | 'expired' | 'pending';
+type FilterStatus = 'all' | 'active' | 'expiring' | 'unpaid' | 'expired' | 'pending';
+
+/** Drives both the Expiring filter and the "Expires in N days" subtitle. */
+const EXPIRING_WITHIN_DAYS = 7;
+
+// "No unpaid members in this gym" read as broken English, and for the derived
+// filters the status word is not a thing a member can be.
+const EMPTY_COPY: Record<FilterStatus, string> = {
+  all: 'No members in this gym yet.',
+  active: 'No active members right now.',
+  expiring: `No memberships expiring in the next ${EXPIRING_WITHIN_DAYS} days.`,
+  unpaid: 'Everyone has a plan recorded — nobody is training unpaid.',
+  expired: 'No expired memberships.',
+  pending: 'No join requests waiting for approval.',
+};
 
 export default function StaffMembersScreen() {
   const insets = useSafeAreaInsets();
@@ -42,7 +56,34 @@ export default function StaffMembersScreen() {
   } = useMembers({
     status: selectedStatus,
     search: searchQuery,
+    expiringWithinDays: EXPIRING_WITHIN_DAYS,
   });
+
+  /**
+   * What the row says under the name. Coverage is now trustworthy for staff
+   * (migration 027); before that every member read "No plan recorded".
+   *
+   * Dates are compared as YYYY-MM-DD strings against the LOCAL today(), not via
+   * Date arithmetic: active_end_date is a DATE column, and daysRemaining()
+   * clamps anything past to 0, so it cannot tell "expires today" from "expired
+   * last month".
+   */
+  const memberSubtitle = (item: (typeof members)[0]): string => {
+    if (item.active_end_date) {
+      const t = today();
+      if (item.active_end_date < t) return `Expired ${formatDate(item.active_end_date)}`;
+      if (item.active_end_date === t) return 'Expires today';
+      const left = daysRemaining(item.active_end_date);
+      if (left <= EXPIRING_WITHIN_DAYS) {
+        return `Expires in ${left} day${left === 1 ? '' : 's'}`;
+      }
+      return `Paid to ${formatDate(item.active_end_date)}`;
+    }
+    // Only a plain member with no coverage is a billing problem worth flagging.
+    // The owner has no plan by design, so show contact details instead.
+    if (item.role === 'member') return 'No plan recorded';
+    return item.profile?.phone || item.profile?.email || 'No contact';
+  };
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
@@ -53,6 +94,13 @@ export default function StaffMembersScreen() {
   const filterTabs: Array<{ label: string; value: FilterStatus }> = [
     { label: 'All', value: 'all' },
     { label: 'Active', value: 'active' },
+    // Also derived: useMembers has supported 'expiring' all along but no screen
+    // ever exposed it. It only became meaningful for staff once migration 027
+    // made coverage dates visible to them -- before that active_end_date was
+    // always null here, so this filter would have returned nobody.
+    { label: 'Expiring', value: 'expiring' },
+    // Derived, not a gym_members.status — active members with no subscription.
+    { label: 'No Plan', value: 'unpaid' },
     { label: 'Expired', value: 'expired' },
     { label: 'Pending', value: 'pending' },
   ];
@@ -133,7 +181,7 @@ export default function StaffMembersScreen() {
             photoUrl={item.profile?.photo_url}
             status={item.status}
             role={item.role}
-            subtitle={item.profile?.phone || item.profile?.email || 'No contact'}
+            subtitle={memberSubtitle(item)}
             onPress={() => setSelectedMember(item)}
           />
         )}
@@ -169,7 +217,7 @@ export default function StaffMembersScreen() {
               <Text style={[styles.emptySubtitle, { color: colors.textSecondary }]}>
                 {searchQuery
                   ? `No members matching "${searchQuery}".`
-                  : `No ${selectedStatus === 'all' ? '' : selectedStatus} members in this gym.`}
+                  : EMPTY_COPY[selectedStatus]}
               </Text>
             </View>
           )

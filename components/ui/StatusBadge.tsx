@@ -8,7 +8,7 @@ import {
 } from 'react-native';
 import { useTheme } from '../../lib/theme';
 
-export type MemberStatus = 'pending' | 'active' | 'expired' | 'rejected';
+export type MemberStatus = 'pending' | 'active' | 'expired' | 'rejected' | 'removed';
 
 export interface StatusBadgeProps {
   status: MemberStatus;
@@ -40,6 +40,13 @@ export default function StatusBadge({ status, style }: StatusBadgeProps) {
           color: colors.statusExpired,
           bg: isDark ? 'rgba(255, 82, 82, 0.15)' : 'rgba(211, 47, 47, 0.12)',
           border: isDark ? 'rgba(255, 82, 82, 0.3)' : 'rgba(211, 47, 47, 0.25)',
+        };
+      case 'removed':
+        return {
+          label: 'Removed',
+          color: colors.textTertiary,
+          bg: isDark ? 'rgba(158, 158, 158, 0.12)' : 'rgba(117, 117, 117, 0.10)',
+          border: isDark ? 'rgba(158, 158, 158, 0.25)' : 'rgba(117, 117, 117, 0.2)',
         };
       case 'rejected':
       default:

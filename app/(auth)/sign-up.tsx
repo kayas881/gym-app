@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   KeyboardAvoidingView,
@@ -35,6 +35,10 @@ export default function SignUpScreen() {
   const [pendingVerification, setPendingVerification] = useState(false);
   const [verificationCode, setVerificationCode] = useState('');
   const [resendingCode, setResendingCode] = useState(false);
+  // Clerk rate-limits verification emails. Without a cooldown, tapping Resend a
+  // few times turns a working screen into a raw rate-limit error, so the button
+  // holds itself shut and says how long for.
+  const [resendCooldown, setResendCooldown] = useState(0);
   const [resendSuccessMessage, setResendSuccessMessage] = useState('');
 
   // Loading & Error states
@@ -150,6 +154,12 @@ export default function SignUpScreen() {
     }
   };
 
+  useEffect(() => {
+    if (resendCooldown <= 0) return;
+    const timer = setTimeout(() => setResendCooldown((s) => s - 1), 1000);
+    return () => clearTimeout(timer);
+  }, [resendCooldown]);
+
   const handleResendCode = async () => {
     if (!isLoaded || !signUp) return;
 
@@ -160,6 +170,7 @@ export default function SignUpScreen() {
     try {
       await signUp.prepareEmailAddressVerification({ strategy: 'email_code' });
       setResendSuccessMessage('A new verification code has been sent to your email.');
+      setResendCooldown(30);
     } catch (err: any) {
       console.error('[SignUp] Resend Code Error:', err);
       const message =
@@ -317,17 +328,17 @@ export default function SignUpScreen() {
                 style={[
                   styles.secondaryButton,
                   { borderColor: colors.border, backgroundColor: colors.surface },
-                  resendingCode && styles.buttonDisabled,
+                  (resendingCode || resendCooldown > 0) && styles.buttonDisabled,
                 ]}
                 onPress={handleResendCode}
-                disabled={resendingCode || loading}
+                disabled={resendingCode || loading || resendCooldown > 0}
                 activeOpacity={0.8}
               >
                 {resendingCode ? (
                   <ActivityIndicator size="small" color={colors.text} />
                 ) : (
                   <Text style={[styles.secondaryButtonText, { color: colors.text }]}>
-                    Resend Code
+                    {resendCooldown > 0 ? `Resend in ${resendCooldown}s` : 'Resend Code'}
                   </Text>
                 )}
               </TouchableOpacity>

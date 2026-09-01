@@ -17,7 +17,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAppAuth } from '../../lib/auth';
 import { useTheme } from '../../lib/theme';
 import { useSubscriptions } from '../../hooks/useSubscriptions';
-import { formatDate } from '../../utils/date';
+import { formatDate, today } from '../../utils/date';
 import { generateReceiptHTML } from '../../utils/receipt-template';
 import Card from '../../components/ui/Card';
 import Badge from '../../components/ui/Badge';
@@ -34,6 +34,8 @@ export default function MemberPaymentsScreen() {
     loading,
     refresh,
   } = useSubscriptions(currentMembership?.id);
+
+  const todayStr = today();
 
   const [refreshing, setRefreshing] = useState(false);
   const [selectedReceipt, setSelectedReceipt] = useState<(typeof subscriptions)[0] | null>(null);
@@ -82,14 +84,22 @@ export default function MemberPaymentsScreen() {
   };
 
   const renderPaymentItem = ({ item }: { item: (typeof subscriptions)[0] }) => {
-    const isActive = item.status === 'active';
+    // Since migration 024 an early renewal is also 'active' while still in the
+    // future, so keying the CURRENT PLAN badge off status alone put it on the
+    // row starting 1 Dec and left the row covering today unlabelled.
+    const isCurrent = item.id === activeSubscription?.id;
+    const isUpcoming = item.status === 'active' && item.start_date > todayStr;
+    // Not active, but its period has not run out: a later payment superseded
+    // it. That is a real payment whose remaining time was given up, so it
+    // must not look the same as a plan that simply ran its course.
+    const isReplaced = item.status !== 'active' && item.end_date >= todayStr;
 
     return (
       <Card
         style={[
           styles.paymentCard,
-          isActive && {
-            borderColor: colors.primary,
+          (isCurrent || isUpcoming) && {
+            borderColor: isCurrent ? colors.primary : colors.info,
             borderWidth: 1.5,
           },
         ]}
@@ -102,13 +112,22 @@ export default function MemberPaymentsScreen() {
               <Text style={[styles.planNameText, { color: colors.text }]}>
                 {item.plan?.name || 'Membership Plan'}
               </Text>
-              {isActive && (
+              {isCurrent ? (
                 <Badge text="CURRENT PLAN" variant="success" size="sm" />
-              )}
+              ) : isUpcoming ? (
+                <Badge text="STARTS SOON" variant="info" size="sm" />
+              ) : isReplaced ? (
+                <Badge text="REPLACED" variant="warning" size="sm" />
+              ) : null}
             </View>
             <Text style={[styles.receiptNumberText, { color: colors.textTertiary }]}>
               {item.receipt_number}
             </Text>
+            {isReplaced ? (
+              <Text style={[styles.replacedNote, { color: colors.warning }]}>
+                Superseded by a later plan — ask your gym if this looks wrong.
+              </Text>
+            ) : null}
           </View>
 
           <Text style={[styles.amountText, { color: colors.primary }]}>
@@ -393,6 +412,11 @@ const styles = StyleSheet.create({
   planNameText: {
     fontSize: 17,
     fontWeight: '700',
+  },
+  replacedNote: {
+    fontSize: 11,
+    lineHeight: 15,
+    marginTop: 4,
   },
   receiptNumberText: {
     fontSize: 12,

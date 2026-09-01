@@ -20,6 +20,7 @@ import { daysRemaining, formatDate, isExpired } from '../../utils/date';
 import Card from '../../components/ui/Card';
 import Badge from '../../components/ui/Badge';
 import Button from '../../components/ui/Button';
+import { useToday } from '../../hooks/useToday';
 
 interface MembershipPlan {
   id: string;
@@ -36,7 +37,13 @@ export default function RenewMembershipScreen() {
   const { gymId, currentMembership, supabase } = useAppAuth();
   const { colors, isDark } = useTheme();
 
-  const { activeSubscription, loading: subLoading, refresh: refreshSub } = useSubscriptions(
+  const {
+    activeSubscription,
+    upcomingSubscription,
+    coverageEndDate,
+    loading: subLoading,
+    refresh: refreshSub,
+  } = useSubscriptions(
     currentMembership?.id
   );
 
@@ -82,11 +89,18 @@ export default function RenewMembershipScreen() {
     setRefreshing(false);
   }, [refreshSub, fetchPlans]);
 
-  const daysLeft = activeSubscription?.end_date ? daysRemaining(activeSubscription.end_date) : 0;
+  // Re-renders this screen when the local day changes or it regains focus.
+  // daysRemaining/isExpired below read the clock, and nothing else here does.
+  useToday();
+
+  // Coverage end, not the current period's end: a member who already renewed
+  // is covered beyond activeSubscription.end_date.
+  const coverageEnd = coverageEndDate ?? activeSubscription?.end_date ?? null;
+  const daysLeft = coverageEnd ? daysRemaining(coverageEnd) : 0;
   // Same distinction as the home screen: a member approved without a payment
   // has no subscription yet but is NOT expired (see migration 003).
-  const expired = activeSubscription?.end_date
-    ? isExpired(activeSubscription.end_date)
+  const expired = coverageEnd
+    ? isExpired(coverageEnd)
     : currentMembership?.status === 'expired';
   const awaitingFirstPlan =
     !activeSubscription?.end_date && currentMembership?.status === 'active';
@@ -219,9 +233,15 @@ export default function RenewMembershipScreen() {
               </Text>
               <Text style={[styles.statusSubtitle, { color: colors.textSecondary }]}>
                 {activeSubscription
-                  ? `Current plan: ${activeSubscription.plan?.name || 'Active'} (Ends ${formatDate(
-                      activeSubscription.end_date
-                    )})`
+                  ? upcomingSubscription
+                    ? `Current: ${activeSubscription.plan?.name || 'Active'} to ${formatDate(
+                        activeSubscription.end_date
+                      )}, then ${upcomingSubscription.plan?.name || 'renewal'} to ${formatDate(
+                        upcomingSubscription.end_date
+                      )}`
+                    : `Current plan: ${activeSubscription.plan?.name || 'Active'} (Ends ${formatDate(
+                        activeSubscription.end_date
+                      )})`
                   : 'No active plan found. Select a plan below.'}
               </Text>
             </View>

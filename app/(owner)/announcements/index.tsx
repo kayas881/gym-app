@@ -17,7 +17,7 @@ import { useAnnouncements } from '../../../hooks/useAnnouncements';
 import Card from '../../../components/ui/Card';
 import Avatar from '../../../components/ui/Avatar';
 import Badge, { BadgeVariant } from '../../../components/ui/Badge';
-import { timeAgo, formatDateTime } from '../../../utils/date';
+import { timestampLabel } from '../../../utils/date';
 
 export default function OwnerAnnouncementsScreen() {
   const router = useRouter();
@@ -67,7 +67,7 @@ export default function OwnerAnnouncementsScreen() {
       case 'afternoon':
         return { label: 'Afternoon (11 AM-4 PM)', variant: 'warning' };
       case 'evening':
-        return { label: 'Evening (4-9 PM)', variant: 'info' };
+        return { label: 'Evening (4-10 PM)', variant: 'info' };
       case 'staff':
         return { label: 'Staff Only', variant: 'error' };
       case 'everyone':
@@ -105,7 +105,7 @@ export default function OwnerAnnouncementsScreen() {
                   {item.author?.full_name || 'Gym Admin'}
                 </Text>
                 <Text style={[styles.timeText, { color: colors.textTertiary }]}>
-                  {timeAgo(item.created_at)} • {formatDateTime(item.created_at)}
+                  {timestampLabel(item.created_at)}
                 </Text>
               </View>
             </View>
@@ -143,9 +143,6 @@ export default function OwnerAnnouncementsScreen() {
               size="sm"
               icon={<Ionicons name="people" size={12} color={colors.textSecondary} />}
             />
-            <Text style={[styles.hintText, { color: colors.textTertiary }]}>
-              Long-press to delete
-            </Text>
           </View>
         </TouchableOpacity>
       </Card>
@@ -241,17 +238,11 @@ export default function OwnerAnnouncementsScreen() {
         />
       )}
 
-      {/* Floating Action Button */}
-      {announcements.length > 0 && (
-        <TouchableOpacity
-          style={[styles.fab, { backgroundColor: colors.primary }]}
-          onPress={() => router.push('/(owner)/announcements/create')}
-          activeOpacity={0.85}
-        >
-          <Ionicons name="megaphone" size={22} color="#000000" />
-          <Text style={styles.fabText}>Post Announcement</Text>
-        </TouchableOpacity>
-      )}
+      {/*
+        No floating action button here: the header already has "+ New" pointing
+        at the same screen, and a centre-anchored FAB covered the list text
+        while scrolling. One affordance is enough.
+      */}
     </View>
   );
 }
@@ -303,7 +294,8 @@ const styles = StyleSheet.create({
   },
   listContent: {
     paddingHorizontal: 16,
-    paddingBottom: 90,
+    // Was 90 to clear a floating button that no longer exists.
+    paddingBottom: 24,
   },
   announcementCard: {
     marginBottom: 12,

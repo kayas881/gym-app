@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useRef, useEffect } from 'react';
+import React, { useState, useMemo, useRef, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -9,13 +9,14 @@ import {
   StyleSheet,
   ActivityIndicator,
 } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useRouter, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAppAuth } from '../../lib/auth';
 import { useTheme } from '../../lib/theme';
 import { useStaffChat } from '../../hooks/useStaffChat';
 import Avatar from '../../components/ui/Avatar';
+import { messageGrouping } from '../../utils/chat-grouping';
 
 export default function StaffChatScreen() {
   const router = useRouter();
@@ -55,6 +56,18 @@ export default function StaffChatScreen() {
     return [...messages].reverse();
   }, [messages]);
 
+  // Jump to the newest message whenever the screen is opened. This list is
+  // `inverted`, so newest is offset 0 — scrollToEnd would go to the OLDEST.
+  // On FOCUS only, so an incoming message while reading history doesn't move you.
+  useFocusEffect(
+    useCallback(() => {
+      const timer = setTimeout(() => {
+        flatListRef.current?.scrollToOffset({ offset: 0, animated: false });
+      }, 120);
+      return () => clearTimeout(timer);
+    }, [])
+  );
+
   const handleSend = async () => {
     const text = inputText.trim();
     if (!text || isSending) return;
@@ -79,8 +92,17 @@ export default function StaffChatScreen() {
     }
   };
 
-  const renderMessageItem = ({ item }: { item: (typeof messages)[0] }) => {
+  const renderMessageItem = ({
+    item,
+    index,
+  }: {
+    item: (typeof messages)[0];
+    index: number;
+  }) => {
     const isMe = item.sender?.id === profile?.id;
+    // A burst from one person collapses into one group: avatar and name on the
+    // first row, timestamp on the last.
+    const { showHeader, showTimestamp } = messageGrouping(messages, index);
     const timeFormatted = new Date(item.created_at).toLocaleTimeString('en-IN', {
       hour: 'numeric',
       minute: '2-digit',
@@ -89,7 +111,7 @@ export default function StaffChatScreen() {
 
     if (isMe) {
       return (
-        <View style={styles.myMessageRow}>
+        <View style={[styles.myMessageRow, !showTimestamp && styles.groupedRow]}>
           <View style={styles.myMessageContainer}>
             <View
               style={[
@@ -99,26 +121,35 @@ export default function StaffChatScreen() {
             >
               <Text style={styles.myMessageText}>{item.message}</Text>
             </View>
-            <Text style={[styles.myTimeText, { color: colors.textTertiary }]}>
-              {timeFormatted}
-            </Text>
+            {showTimestamp ? (
+              <Text style={[styles.myTimeText, { color: colors.textTertiary }]}>
+                {timeFormatted}
+              </Text>
+            ) : null}
           </View>
         </View>
       );
     }
 
     return (
-      <View style={styles.otherMessageRow}>
-        <Avatar
-          uri={item.sender?.photo_url}
-          name={item.sender?.full_name || 'Staff'}
-          size={32}
-          style={styles.senderAvatar}
-        />
+      <View style={[styles.otherMessageRow, !showTimestamp && styles.groupedRow]}>
+        {showHeader ? (
+          <Avatar
+            uri={item.sender?.photo_url}
+            name={item.sender?.full_name || 'Staff'}
+            size={32}
+            style={styles.senderAvatar}
+          />
+        ) : (
+          // Keeps grouped bubbles left-aligned with the first one.
+          <View style={styles.avatarSpacer} />
+        )}
         <View style={styles.otherMessageContainer}>
-          <Text style={[styles.senderName, { color: colors.textSecondary }]}>
-            {item.sender?.full_name || 'Staff Member'}
-          </Text>
+          {showHeader ? (
+            <Text style={[styles.senderName, { color: colors.textSecondary }]}>
+              {item.sender?.full_name || 'Staff Member'}
+            </Text>
+          ) : null}
           <View
             style={[
               styles.otherBubble,
@@ -129,9 +160,11 @@ export default function StaffChatScreen() {
               {item.message}
             </Text>
           </View>
-          <Text style={[styles.otherTimeText, { color: colors.textTertiary }]}>
-            {timeFormatted}
-          </Text>
+          {showTimestamp ? (
+            <Text style={[styles.otherTimeText, { color: colors.textTertiary }]}>
+              {timeFormatted}
+            </Text>
+          ) : null}
         </View>
       </View>
     );
@@ -335,6 +368,9 @@ const styles = StyleSheet.create({
     alignItems: 'flex-end',
   },
   myBubble: {
+    // A one-character message ('K') collapsed to a circle at this
+    // border radius; a floor keeps every bubble readable as a bubble.
+    minWidth: 56,
     paddingHorizontal: 14,
     paddingVertical: 10,
     borderRadius: 18,
@@ -360,6 +396,14 @@ const styles = StyleSheet.create({
     marginRight: 8,
     marginTop: 14,
   },
+  // Avatar width (32) plus its right margin (8), so grouped bubbles line up.
+  avatarSpacer: {
+    width: 40,
+  },
+  // Rows inside a group sit tighter than the 12pt gap between groups.
+  groupedRow: {
+    marginBottom: 2,
+  },
   otherMessageContainer: {
     maxWidth: '78%',
     alignItems: 'flex-start',
@@ -371,6 +415,9 @@ const styles = StyleSheet.create({
     marginLeft: 4,
   },
   otherBubble: {
+    // A one-character message ('K') collapsed to a circle at this
+    // border radius; a floor keeps every bubble readable as a bubble.
+    minWidth: 56,
     paddingHorizontal: 14,
     paddingVertical: 10,
     borderRadius: 18,

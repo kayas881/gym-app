@@ -23,7 +23,16 @@ import Button from '../../../components/ui/Button';
 import Input from '../../../components/ui/Input';
 import Avatar from '../../../components/ui/Avatar';
 import StatusBadge from '../../../components/ui/StatusBadge';
-import { calculateEndDate, formatDate, today } from '../../../utils/date';
+import {
+  calculateEndDate,
+  formatDate,
+  today,
+  daysFromToday,
+  renewalStartDate,
+  isValidDateString,
+  parseIndianDate,
+  toIndianDate,
+} from '../../../utils/date';
 import { generateReceiptHTML } from '../../../utils/receipt-template';
 
 interface MembershipPlan {
@@ -48,7 +57,19 @@ export default function RecordPaymentScreen() {
 
   // Step 1: Member search & selection
   const [memberSearch, setMemberSearch] = useState('');
-  const { members, loading: membersLoading } = useMembers({ status: 'all', search: memberSearch });
+  // role 'member' only: the owner and staff also have gym_members rows, so
+  // without it this screen offered a payment against yourself or your trainer.
+  const { members: allMembers, loading: membersLoading } = useMembers({
+    status: 'all',
+    role: 'member',
+    search: memberSearch,
+  });
+
+  // A rejected applicant is not someone you can take money from.
+  const members = useMemo(
+    () => allMembers.filter((m) => m.status !== 'rejected'),
+    [allMembers]
+  );
   const [selectedMember, setSelectedMember] = useState<(typeof members)[0] | null>(null);
 
   // Step 2: Plans fetch & selection
@@ -59,7 +80,25 @@ export default function RecordPaymentScreen() {
   // Step 3: Payment details
   const [amountPaid, setAmountPaid] = useState<string>('');
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('upi');
+  // startDate stays ISO YYYY-MM-DD -- it is compared as a string against
+  // active_end_date, fed to calculateEndDate and passed to
+  // record_subscription_payment, all of which depend on ISO ordering.
+  // startDateText is the day-first form the owner actually types.
   const [startDate, setStartDate] = useState<string>(today());
+  const [startDateText, setStartDateText] = useState<string>(toIndianDate(today()));
+
+  // Set both from a known-good ISO date (quick chips, member selection).
+  const applyStartDate = (iso: string) => {
+    setStartDate(iso);
+    setStartDateText(toIndianDate(iso));
+  };
+
+  // Typing: keep every keystroke, and blank the ISO value while the text is
+  // incomplete so the isValidDateString guards below still stop a bad submit.
+  const onStartDateTextChange = (text: string) => {
+    setStartDateText(text);
+    setStartDate(parseIndianDate(text) ?? '');
+  };
 
   // Step 4: Submission & Receipt
   const { createSubscription } = useSubscriptions();
@@ -115,8 +154,18 @@ export default function RecordPaymentScreen() {
     }
   }, [startDate, selectedPlan]);
 
-  // Confirm payment submission
-  const handleConfirmPayment = async () => {
+  // Same guard as the member-detail sheet: record_subscription_payment expires
+  // whatever the new period overlaps, so an overlapping start date gives up the
+  // rest of a plan the member already paid for. active_end_date from useMembers
+  // is already the member's latest active end date.
+  const overlapsPaidTime = !!(
+    selectedMember?.active_end_date &&
+    startDate &&
+    isValidDateString(startDate) &&
+    startDate <= selectedMember.active_end_date
+  );
+
+  const submitPayment = async () => {
     if (!selectedMember || !selectedPlan) {
       Alert.alert('Incomplete Details', 'Please select both a member and a plan.');
       return;
@@ -125,6 +174,12 @@ export default function RecordPaymentScreen() {
     const numericAmount = parseFloat(amountPaid);
     if (isNaN(numericAmount) || numericAmount < 0) {
       Alert.alert('Invalid Amount', 'Please enter a valid payment amount.');
+      return;
+    }
+
+    // Free-text field: "31/02/2026" and a half-typed date both get this far.
+    if (!isValidDateString(startDate)) {
+      Alert.alert('Invalid Start Date', 'Please enter the start date as DD/MM/YYYY.');
       return;
     }
 
@@ -145,6 +200,47 @@ export default function RecordPaymentScreen() {
     } finally {
       setIsSubmitting(false);
     }
+  };
+
+  const handleConfirmPayment = () => {
+    if (!selectedMember || !selectedPlan) {
+      Alert.alert('Incomplete Details', 'Please select both a member and a plan.');
+      return;
+    }
+
+    const numericAmount = parseFloat(amountPaid);
+    if (isNaN(numericAmount) || numericAmount < 0) {
+      Alert.alert('Invalid Amount', 'Please enter a valid payment amount.');
+      return;
+    }
+
+    if (!isValidDateString(startDate)) {
+      Alert.alert('Invalid Start Date', 'Please enter the start date as DD/MM/YYYY.');
+      return;
+    }
+
+    if (overlapsPaidTime && selectedMember.active_end_date) {
+      const paidTo = selectedMember.active_end_date;
+      Alert.alert(
+        'This replaces paid time',
+        `${selectedMember.profile?.full_name || 'This member'} is already paid up to ${formatDate(
+          paidTo
+        )}. Starting a new plan on ${formatDate(
+          startDate
+        )} replaces that plan, and the remaining days are lost.
+
+To add time instead, use ${formatDate(
+          renewalStartDate(paidTo)
+        )}.`,
+        [
+          { text: 'Cancel', style: 'cancel' },
+          { text: 'Replace anyway', style: 'destructive', onPress: submitPayment },
+        ]
+      );
+      return;
+    }
+
+    submitPayment();
   };
 
   // Share generated PDF receipt
@@ -237,7 +333,12 @@ export default function RecordPaymentScreen() {
             return (
               <Card
                 key={m.id}
-                onPress={() => setSelectedMember(m)}
+                onPress={() => {
+                  setSelectedMember(m);
+                  // Renewing early must add time, not restart the clock —
+                  // record_subscription_payment expires the old subscription.
+                  applyStartDate(renewalStartDate(m.active_end_date));
+                }}
                 style={[
                   styles.memberSelectCard,
                   isSelected && {
@@ -431,10 +532,10 @@ export default function RecordPaymentScreen() {
 
       {/* Start Date */}
       <Input
-        label="Start Date (YYYY-MM-DD)"
-        placeholder="YYYY-MM-DD"
-        value={startDate}
-        onChangeText={setStartDate}
+        label="Start Date (DD/MM/YYYY)"
+        placeholder="e.g. 01/09/2026"
+        value={startDateText}
+        onChangeText={onStartDateTextChange}
         leftIcon={<Ionicons name="calendar-outline" size={18} color={colors.textTertiary} />}
       />
 
@@ -442,18 +543,16 @@ export default function RecordPaymentScreen() {
       <View style={styles.quickDateChips}>
         <TouchableOpacity
           style={[styles.dateChip, { backgroundColor: colors.surfaceElevated, borderColor: colors.border }]}
-          onPress={() => setStartDate(today())}
+          onPress={() => applyStartDate(today())}
         >
           <Text style={[styles.dateChipText, { color: colors.textSecondary }]}>Today</Text>
         </TouchableOpacity>
 
         <TouchableOpacity
           style={[styles.dateChip, { backgroundColor: colors.surfaceElevated, borderColor: colors.border }]}
-          onPress={() => {
-            const tmrw = new Date();
-            tmrw.setDate(tmrw.getDate() + 1);
-            setStartDate(tmrw.toISOString().split('T')[0]);
-          }}
+          // daysFromToday, not toISOString().split('T')[0]: the latter reads the
+          // UTC day, so before 05:30 IST "Tomorrow" filled in today's date.
+          onPress={() => applyStartDate(daysFromToday(1))}
         >
           <Text style={[styles.dateChipText, { color: colors.textSecondary }]}>Tomorrow</Text>
         </TouchableOpacity>

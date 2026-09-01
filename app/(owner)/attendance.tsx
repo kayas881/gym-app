@@ -129,7 +129,7 @@ export default function OwnerTodayAttendanceScreen() {
 
         <View style={styles.headerActions}>
           <Badge
-            text={`${records.length} Check-ins`}
+            text={`${records.length} ${records.length === 1 ? 'Check-in' : 'Check-ins'}`}
             variant="success"
             size="md"
           />

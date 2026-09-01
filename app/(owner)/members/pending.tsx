@@ -11,7 +11,7 @@ import {
   RefreshControl,
   ScrollView,
 } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useRouter, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useAppAuth } from '../../../lib/auth';
 import { useTheme } from '../../../lib/theme';
@@ -93,6 +93,15 @@ export default function PendingApprovalsScreen() {
   useEffect(() => {
     fetchRenewalRequests();
   }, [fetchRenewalRequests]);
+
+  // record_subscription_payment closes the request, so returning from the
+  // member's profile has to re-read it or the queue keeps showing a request
+  // that has already been paid.
+  useFocusEffect(
+    useCallback(() => {
+      fetchRenewalRequests();
+    }, [fetchRenewalRequests])
+  );
 
   const handleRejectRenewal = (requestId: string, memberName: string) => {
     Alert.alert(
@@ -240,6 +249,11 @@ export default function PendingApprovalsScreen() {
   const renderEmptyState = () => {
     if (loading) return null;
 
+    // `members` holds applicants only, so with zero applicants and an open
+    // renewal request this would otherwise render "No Pending Approvals"
+    // directly below the renewal the owner came here to action.
+    if (renewalRequests.length > 0) return null;
+
     return (
       <View style={styles.emptyContainer}>
         <View
@@ -274,10 +288,19 @@ export default function PendingApprovalsScreen() {
 
         <View style={styles.headerTitleGroup}>
           <Text style={[styles.headerTitle, { color: colors.text }]}>
-            Pending Approvals
+            Approvals & Requests
           </Text>
           <Text style={[styles.headerSubtitle, { color: colors.textSecondary }]}>
-            {members.length} {members.length === 1 ? 'applicant waiting' : 'applicants waiting'}
+            {[
+              members.length > 0
+                ? `${members.length} ${members.length === 1 ? 'applicant' : 'applicants'}`
+                : null,
+              renewalRequests.length > 0
+                ? `${renewalRequests.length} ${renewalRequests.length === 1 ? 'renewal' : 'renewals'}`
+                : null,
+            ]
+              .filter(Boolean)
+              .join(' · ') || 'Nothing waiting'}
           </Text>
         </View>
       </View>
@@ -340,8 +363,14 @@ export default function PendingApprovalsScreen() {
                           size="sm"
                           // The member detail screen owns the payment modal;
                           // recording there closes this request automatically.
+                          // `action=record` opens that modal on arrival with
+                          // the requested plan already selected, instead of
+                          // dropping the owner on a profile to hunt for the
+                          // button and pick the plan themselves.
                           onPress={() =>
-                            router.push(`/(owner)/members/${req.gym_member_id}`)
+                            router.push(
+                              `/(owner)/members/${req.gym_member_id}?action=record`
+                            )
                           }
                           style={styles.renewalBtn}
                         />

@@ -8,6 +8,7 @@ import {
   KeyboardAvoidingView,
   Platform,
   Alert,
+  Modal,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
@@ -15,6 +16,14 @@ import { Ionicons } from '@expo/vector-icons';
 import { useAppAuth } from '../../lib/auth';
 import { useTheme } from '../../lib/theme';
 import { Input, Button, Card } from '../../components/ui';
+import { CameraView, useCameraPermissions, BarcodeScanningResult } from 'expo-camera';
+import { parseGymJoinQrPayload } from '../../components/GymQRCode';
+import {
+  DAY_KEYS,
+  defaultOperatingHours,
+  parseTimeInput,
+  serializeOperatingHours,
+} from '../../utils/operating-hours';
 
 type SetupTab = 'create' | 'join';
 
@@ -37,6 +46,26 @@ export default function SetupGymScreen() {
   const [gymCode, setGymCode] = useState('');
   const [gymCodeError, setGymCodeError] = useState('');
   const [isJoining, setIsJoining] = useState(false);
+  const [scannerVisible, setScannerVisible] = useState(false);
+  const [permission, requestPermission] = useCameraPermissions();
+
+  /**
+   * A gym is joined with its six-character join_code (migration 030). Owners who
+   * already sent someone the raw UUID keep working -- that is what the UUID
+   * branch is for -- but it is no longer what anyone is asked to type.
+   *
+   * Codes are stored uppercase from an alphabet with no I, L, O, 0 or 1, so
+   * input is upper-cased and anything that is not A-Z or 0-9 is dropped. That
+   * quietly absorbs the spaces, hyphens and stray punctuation people add when
+   * copying a code out of a WhatsApp message.
+   */
+  const looksLikeUuid = (value: string) =>
+    /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/.test(
+      value
+    );
+
+  const normalizeJoinCode = (raw: string) =>
+    raw.trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
 
   // Handle Create Gym
   const handleCreateGym = async () => {
@@ -51,8 +80,42 @@ export default function SetupGymScreen() {
       return;
     }
 
+    // Free-text time fields feeding a structured document, so parse before
+    // saving rather than storing whatever was typed. A wrong closing time is
+    // not cosmetic: it decides who counts as an evening member for targeted
+    // announcements.
+    const openIso = parseTimeInput(openingTime);
+    const closeIso = parseTimeInput(closingTime);
+    if (!openIso || !closeIso) {
+      Alert.alert(
+        'Check your opening hours',
+        'Enter times like 6:00 AM and 10:00 PM.'
+      );
+      return;
+    }
+    if (openIso === closeIso) {
+      Alert.alert(
+        'Check your opening hours',
+        'Opening and closing time cannot be the same.'
+      );
+      return;
+    }
+
     setIsCreating(true);
     try {
+      // Build the version-2 hours document migration 023 introduced.
+      //
+      // This used to write { opening, closing, summary } -- the pre-023 shape --
+      // so every NEW gym was born legacy: parseOperatingHours() returns
+      // hours: null for that, meaning no per-day hours and no "open now" until
+      // the owner happened to open Gym Hours and re-save. These two fields set
+      // the same times for all seven days; the owner refines individual days,
+      // and weekly closures, on the Gym Hours screen afterwards.
+      const hours = defaultOperatingHours();
+      for (const key of DAY_KEYS) {
+        hours.days[key] = { closed: false, open: openIso, close: closeIso };
+      }
+
       // 1. Insert gym into gyms table
       const { data: gymData, error: gymError } = await supabase
         .from('gyms')
@@ -60,13 +123,8 @@ export default function SetupGymScreen() {
           name: gymName.trim(),
           address: gymAddress.trim() || null,
           owner_clerk_id: userId,
-          // `gyms` stores hours as a JSONB column, not separate time columns.
-          // `summary` is the shape app/(owner)/settings.tsx reads back.
-          operating_hours: {
-            opening: openingTime.trim() || '6:00 AM',
-            closing: closingTime.trim() || '10:00 PM',
-            summary: `${openingTime.trim() || '6:00 AM'} - ${closingTime.trim() || '10:00 PM'}`,
-          },
+          // gyms stores hours as a JSONB column, not separate time columns.
+          operating_hours: serializeOperatingHours(hours),
         })
         .select()
         .single();
@@ -133,11 +191,48 @@ export default function SetupGymScreen() {
     }
   };
 
+  const openScanner = async () => {
+    if (!permission?.granted) {
+      const result = await requestPermission();
+      if (!result.granted) {
+        Alert.alert(
+          'Camera Permission Needed',
+          'We need the camera to read your gym’s QR code. You can also type the 6-character code instead.'
+        );
+        return;
+      }
+    }
+    setScannerVisible(true);
+  };
+
+  const handleJoinScan = ({ data }: BarcodeScanningResult) => {
+    const scanned = parseGymJoinQrPayload(data);
+    if (!scanned) {
+      // Most likely the check-in QR, which carries { gym_id } instead. Say so
+      // rather than failing silently -- both posters live in the same gym.
+      setScannerVisible(false);
+      Alert.alert(
+        'Not a join code',
+        'That looks like the check-in QR, not the join poster. Ask for the "Join" code, or type the 6 characters instead.'
+      );
+      return;
+    }
+    setScannerVisible(false);
+    setGymCode(scanned);
+    setGymCodeError('');
+  };
+
   // Handle Join Gym
   const handleJoinGym = async () => {
-    const trimmedCode = gymCode.trim();
-    if (!trimmedCode) {
-      setGymCodeError('Please enter a Gym ID or Code');
+    const rawCode = gymCode.trim();
+    if (!rawCode) {
+      setGymCodeError('Please enter your gym code');
+      return;
+    }
+    const isUuid = looksLikeUuid(rawCode);
+    const joinCode = isUuid ? rawCode : normalizeJoinCode(rawCode);
+    if (!isUuid && joinCode.length !== 6) {
+      setGymCodeError('A gym code is 6 characters, like T6JBRC');
       return;
     }
     setGymCodeError('');
@@ -149,17 +244,17 @@ export default function SetupGymScreen() {
 
     setIsJoining(true);
     try {
-      // 1. Look up gym by ID
+      // Look the gym up by join code, or by id when someone pastes an old UUID.
       const { data: gymData, error: gymLookupError } = await supabase
         .from('gyms')
         .select('id, name')
-        .eq('id', trimmedCode)
+        .eq(isUuid ? 'id' : 'join_code', joinCode)
         .maybeSingle();
 
       if (gymLookupError || !gymData) {
         Alert.alert(
           'Gym Not Found',
-          'Could not find a gym matching this code. Please check with your gym owner or staff.'
+          `No gym has the code "${joinCode}". Codes are 6 characters and are shown on the poster at your gym -- check it with your gym's staff.`
         );
         return;
       }
@@ -501,22 +596,25 @@ export default function SetupGymScreen() {
                       { color: colors.textSecondary },
                     ]}
                   >
-                    Enter the unique Gym ID or Code provided by your gym owner or front desk staff.
+                    Enter the 6-character code on the poster at your gym, or scan its QR code. Your gym's staff can also read it out to you.
                   </Text>
                 </View>
               </Card>
 
               <Input
-                label="Gym ID / Code *"
-                placeholder="Paste Gym ID here..."
+                label="Gym Code *"
+                placeholder="e.g. T6JBRC"
                 value={gymCode}
                 onChangeText={(text) => {
-                  setGymCode(text);
+                  // Upper-cased as it is typed: the codes are uppercase, and
+                  // leaving it lowercase makes a correct code look wrong.
+                  setGymCode(looksLikeUuid(text.trim()) ? text : text.toUpperCase());
                   if (text.trim()) setGymCodeError('');
                 }}
                 error={gymCodeError}
-                autoCapitalize="none"
+                autoCapitalize="characters"
                 autoCorrect={false}
+                maxLength={40}
                 leftIcon={
                   <Ionicons
                     name="key-outline"
@@ -525,6 +623,24 @@ export default function SetupGymScreen() {
                   />
                 }
               />
+
+              {/* The fast path when the member is standing at the gym looking
+                  at the poster. Typing the six characters stays available for a
+                  camera that will not focus, or joining from home. */}
+              <TouchableOpacity
+                onPress={openScanner}
+                activeOpacity={0.7}
+                style={[
+                  styles.scanRow,
+                  { borderColor: colors.border, backgroundColor: colors.surface },
+                ]}
+              >
+                <Ionicons name="qr-code-outline" size={20} color={colors.primary} />
+                <Text style={[styles.scanRowText, { color: colors.text }]}>
+                  Scan the QR on your gym's poster
+                </Text>
+                <Ionicons name="chevron-forward" size={16} color={colors.textTertiary} />
+              </TouchableOpacity>
 
               <View style={styles.submitContainer}>
                 <Button
@@ -567,11 +683,93 @@ export default function SetupGymScreen() {
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
+
+      <Modal
+        visible={scannerVisible}
+        animationType="slide"
+        onRequestClose={() => setScannerVisible(false)}
+      >
+        <View style={styles.scannerScreen}>
+          {scannerVisible ? (
+            <CameraView
+              style={StyleSheet.absoluteFill}
+              facing="back"
+              barcodeScannerSettings={{ barcodeTypes: ['qr'] }}
+              onBarcodeScanned={handleJoinScan}
+            />
+          ) : null}
+
+          <View style={styles.scannerOverlay}>
+            <View style={styles.scannerFrame} />
+            <Text style={styles.scannerHint}>
+              Point the camera at the QR code on your gym's join poster
+            </Text>
+          </View>
+
+          <TouchableOpacity
+            onPress={() => setScannerVisible(false)}
+            style={styles.scannerCancel}
+            activeOpacity={0.8}
+          >
+            <Ionicons name="close" size={22} color="#FFFFFF" />
+            <Text style={styles.scannerCancelText}>Cancel</Text>
+          </TouchableOpacity>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
+  scanRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    borderWidth: 1,
+    borderRadius: 12,
+    paddingVertical: 14,
+    paddingHorizontal: 14,
+    marginTop: 12,
+  },
+  scanRowText: { flex: 1, fontSize: 14, fontWeight: '600' },
+  scannerScreen: { flex: 1, backgroundColor: '#000000' },
+  scannerOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  scannerFrame: {
+    width: 240,
+    height: 240,
+    borderWidth: 3,
+    borderColor: '#00E676',
+    borderRadius: 20,
+    backgroundColor: 'transparent',
+  },
+  scannerHint: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    textAlign: 'center',
+    marginTop: 20,
+    paddingHorizontal: 40,
+  },
+  scannerCancel: {
+    position: 'absolute',
+    bottom: 48,
+    alignSelf: 'center',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingVertical: 12,
+    paddingHorizontal: 22,
+    borderRadius: 24,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+  },
+  scannerCancelText: { color: '#FFFFFF', fontSize: 15, fontWeight: '700' },
   safeArea: {
     flex: 1,
   },

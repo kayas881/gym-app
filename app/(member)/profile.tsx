@@ -18,6 +18,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAppAuth } from '../../lib/auth';
 import { useTheme } from '../../lib/theme';
 import { uploadImageAsset, isLocalFileUri } from '../../lib/storage';
+import { dateOfBirthError, parseIndianDate, toIndianDate } from '../../utils/date';
 import Avatar from '../../components/ui/Avatar';
 import Input from '../../components/ui/Input';
 import Button from '../../components/ui/Button';
@@ -53,10 +54,16 @@ export default function MemberProfileScreen() {
   // Form states
   const [fullName, setFullName] = useState(profile?.full_name || '');
   const [phone, setPhone] = useState(profile?.phone || '');
-  const [dateOfBirth, setDateOfBirth] = useState(profile?.date_of_birth || '');
+  // Held in the day-first form the user sees; converted to ISO on save.
+  const [dateOfBirth, setDateOfBirth] = useState(toIndianDate(profile?.date_of_birth));
   const [gender, setGender] = useState(profile?.gender || '');
   const [fitnessGoal, setFitnessGoal] = useState(profile?.fitness_goal || '');
   const [preferredTiming, setPreferredTiming] = useState(profile?.preferred_gym_timing || '');
+  // Both are collected by the complete-profile signup step but were absent from
+  // this form, so a member could never see or correct their own address, nor the
+  // medical notes staff may act on in an emergency.
+  const [address, setAddress] = useState(profile?.address || '');
+  const [healthNotes, setHealthNotes] = useState(profile?.health_notes || '');
   const [emergencyName, setEmergencyName] = useState(profile?.emergency_contact_name || '');
   const [emergencyPhone, setEmergencyPhone] = useState(profile?.emergency_contact_phone || '');
   // Photos saved before Storage uploads existed are dead local paths — ignore
@@ -75,10 +82,12 @@ export default function MemberProfileScreen() {
     if (profile) {
       setFullName(profile.full_name || '');
       setPhone(profile.phone || '');
-      setDateOfBirth(profile.date_of_birth || '');
+      setDateOfBirth(toIndianDate(profile.date_of_birth));
       setGender(profile.gender || '');
       setFitnessGoal(profile.fitness_goal || '');
       setPreferredTiming(profile.preferred_gym_timing || '');
+      setAddress(profile.address || '');
+      setHealthNotes(profile.health_notes || '');
       setEmergencyName(profile.emergency_contact_name || '');
       setEmergencyPhone(profile.emergency_contact_phone || '');
       // Same guard as the initial state: don't resurrect a dead local path.
@@ -92,10 +101,12 @@ export default function MemberProfileScreen() {
     return (
       fullName !== (profile.full_name || '') ||
       phone !== (profile.phone || '') ||
-      dateOfBirth !== (profile.date_of_birth || '') ||
+      parseIndianDate(dateOfBirth) !== (profile.date_of_birth || null) ||
       gender !== (profile.gender || '') ||
       fitnessGoal !== (profile.fitness_goal || '') ||
       preferredTiming !== (profile.preferred_gym_timing || '') ||
+      address !== (profile.address || '') ||
+      healthNotes !== (profile.health_notes || '') ||
       emergencyName !== (profile.emergency_contact_name || '') ||
       emergencyPhone !== (profile.emergency_contact_phone || '') ||
       photoUrl !== (profile.photo_url || null)
@@ -108,6 +119,8 @@ export default function MemberProfileScreen() {
     gender,
     fitnessGoal,
     preferredTiming,
+    address,
+    healthNotes,
     emergencyName,
     emergencyPhone,
     photoUrl,
@@ -122,7 +135,7 @@ export default function MemberProfileScreen() {
       }
 
       const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        mediaTypes: ['images'],
         allowsEditing: true,
         aspect: [1, 1],
         quality: 0.8,
@@ -142,6 +155,12 @@ export default function MemberProfileScreen() {
   };
 
   const handleSaveProfile = async () => {
+    const dobError = dateOfBirthError(dateOfBirth);
+    if (dobError) {
+      Alert.alert('Check your date of birth', dobError);
+      return;
+    }
+
     if (!profile?.id) return;
     if (!fullName.trim()) {
       Alert.alert('Required Field', 'Please enter your full name.');
@@ -181,10 +200,12 @@ export default function MemberProfileScreen() {
         .update({
           full_name: fullName.trim(),
           phone: phone.trim() || null,
-          date_of_birth: dateOfBirth.trim() || null,
+          date_of_birth: parseIndianDate(dateOfBirth),
           gender: gender || null,
           fitness_goal: fitnessGoal || null,
           preferred_gym_timing: preferredTiming || null,
+          address: address.trim() || null,
+          health_notes: healthNotes.trim() || null,
           emergency_contact_name: emergencyName.trim() || null,
           emergency_contact_phone: emergencyPhone.trim() || null,
           photo_url: photoUrlToSave || null,
@@ -294,8 +315,8 @@ export default function MemberProfileScreen() {
           />
 
           <Input
-            label="Date of Birth (YYYY-MM-DD)"
-            placeholder="1995-08-15"
+            label="Date of Birth (DD/MM/YYYY)"
+            placeholder="15/08/1995"
             value={dateOfBirth}
             onChangeText={setDateOfBirth}
             leftIcon={<Ionicons name="calendar-outline" size={18} color={colors.textSecondary} />}
@@ -428,6 +449,50 @@ export default function MemberProfileScreen() {
             keyboardType="phone-pad"
             leftIcon={<Ionicons name="call-outline" size={18} color={colors.textSecondary} />}
           />
+
+          <Input
+            label="Address"
+            placeholder="Street, area, city"
+            value={address}
+            onChangeText={setAddress}
+            autoCapitalize="words"
+            leftIcon={<Ionicons name="home-outline" size={18} color={colors.textSecondary} />}
+          />
+
+          <Input
+            label="Medical Notes"
+            placeholder="Injuries, allergies, conditions staff should know about"
+            value={healthNotes}
+            onChangeText={setHealthNotes}
+            multiline
+            numberOfLines={3}
+            leftIcon={<Ionicons name="medkit-outline" size={18} color={colors.textSecondary} />}
+          />
+          <Text style={[styles.helperText, { color: colors.textTertiary }]}>
+            Only you and your gym's staff can see this.
+          </Text>
+        </Card>
+
+        {/* Where a member finds their gym's hours, phone number and owner.
+            Linked from here and from the home screen header — a screen with no
+            entry point may as well not exist. */}
+        <Card
+          style={styles.sectionCard}
+          padding={16}
+          onPress={() => router.push('/(member)/gym-info')}
+        >
+          <View style={styles.gymInfoRow}>
+            <Ionicons name="business-outline" size={22} color={colors.primary} />
+            <View style={styles.gymInfoText}>
+              <Text style={[styles.gymInfoTitle, { color: colors.text }]}>
+                My Gym
+              </Text>
+              <Text style={[styles.gymInfoSub, { color: colors.textSecondary }]}>
+                Opening hours, contact details and owner
+              </Text>
+            </View>
+            <Ionicons name="chevron-forward" size={18} color={colors.textTertiary} />
+          </View>
         </Card>
 
         {/* App Settings / Theme Toggle */}
@@ -543,6 +608,15 @@ const styles = StyleSheet.create({
   sectionCard: {
     marginBottom: 16,
   },
+  helperText: {
+    fontSize: 12,
+    marginTop: -4,
+    marginBottom: 4,
+  },
+  gymInfoRow: { flexDirection: 'row', alignItems: 'center', gap: 14 },
+  gymInfoText: { flex: 1 },
+  gymInfoTitle: { fontSize: 15, fontWeight: '700' },
+  gymInfoSub: { fontSize: 12, marginTop: 2 },
   sectionTitle: {
     fontSize: 16,
     fontWeight: '700',

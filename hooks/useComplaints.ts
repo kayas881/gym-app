@@ -12,6 +12,7 @@ interface Complaint {
   status: 'new' | 'acknowledged' | 'resolved';
   owner_response: string | null;
   created_at: string;
+  updated_at: string;
   member?: {
     profile: {
       full_name: string;

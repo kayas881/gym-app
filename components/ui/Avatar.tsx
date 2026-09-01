@@ -14,6 +14,11 @@ export interface AvatarProps {
   uri?: string | null;
   name: string;
   size?: number;
+  /**
+   * 'circle' (default) for people. 'rounded' for a gym logo: a squared frame
+   * that fits the whole image instead of cropping a circle out of the middle.
+   */
+  shape?: 'circle' | 'rounded';
   style?: StyleProp<ViewStyle>;
 }
 
@@ -31,12 +36,13 @@ export default function Avatar({
   uri,
   name,
   size = 40,
+  shape = 'circle',
   style,
 }: AvatarProps) {
   const { colors } = useTheme();
   const [imageError, setImageError] = useState(false);
 
-  const borderRadius = size / 2;
+  const borderRadius = shape === 'rounded' ? Math.round(size * 0.22) : size / 2;
   const fontSize = Math.max(10, Math.round(size * 0.38));
   const initials = getInitials(name);
 
@@ -68,7 +74,9 @@ export default function Avatar({
           source={{ uri }}
           style={[styles.image, imageStyle]}
           onError={() => setImageError(true)}
-          resizeMode="cover"
+          // 'contain' for a logo so none of it is cut off; 'cover' for a face,
+          // where filling the frame matters more than seeing the edges.
+          resizeMode={shape === 'rounded' ? 'contain' : 'cover'}
         />
       ) : (
         <Text

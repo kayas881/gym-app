@@ -63,7 +63,7 @@ export function getTimeSlotLabel(slot: TimeSlot): string {
   const labels: Record<TimeSlot, string> = {
     morning: '🌅 Morning (5-11 AM)',
     afternoon: '☀️ Afternoon (11 AM-4 PM)',
-    evening: '🌙 Evening (4-9 PM)',
+    evening: '🌙 Evening (4-10 PM)',
   };
   return labels[slot];
 }

@@ -97,6 +97,7 @@ export default function MemberLayout() {
 
       {/* Pushed from home/profile — not tabs. */}
       <Tabs.Screen name="payments" options={{ href: null }} />
+      <Tabs.Screen name="gym-info" options={{ href: null }} />
       <Tabs.Screen name="renew" options={{ href: null }} />
       <Tabs.Screen name="complaints/index" options={{ href: null }} />
       <Tabs.Screen name="complaints/create" options={{ href: null }} />

@@ -37,6 +37,40 @@ export function buildPermanentGymQrPayload(gymId: string): string {
   return JSON.stringify({ gym_id: gymId });
 }
 
+/**
+ * The payload for a gym's JOIN code -- deliberately a different shape from the
+ * check-in payload above.
+ *
+ * Check-in carries { gym_id }, joining carries { join_code }. Keeping them
+ * distinct means each scanner can recognise the other's code and say so, rather
+ * than a member holding a join poster up to the check-in scanner and getting an
+ * unexplained failure. The code is also emitted as plain text by generic QR
+ * readers, which is why the six characters are printed under the square too.
+ */
+export function buildGymJoinQrPayload(joinCode: string): string {
+  return JSON.stringify({ join_code: joinCode.toUpperCase() });
+}
+
+/**
+ * Read a scanned QR and pull out a join code, whether it is our JSON payload or
+ * a bare six-character code typed into some other QR generator.
+ */
+export function parseGymJoinQrPayload(data: string): string | null {
+  const raw = data.trim();
+  try {
+    const parsed = JSON.parse(raw);
+    if (parsed && typeof parsed.join_code === 'string') {
+      return parsed.join_code.toUpperCase();
+    }
+    // A check-in code, not a join code -- let the caller tell them apart.
+    if (parsed && typeof parsed.gym_id === 'string') return null;
+  } catch {
+    // Not JSON; fall through to the bare-code case.
+  }
+  const bare = raw.toUpperCase().replace(/[^A-Z0-9]/g, '');
+  return bare.length === 6 ? bare : null;
+}
+
 interface GymQRCodeProps {
   gymId: string;
   gymName?: string | null;

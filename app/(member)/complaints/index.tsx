@@ -14,7 +14,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAppAuth } from '../../../lib/auth';
 import { useTheme } from '../../../lib/theme';
 import { useComplaints } from '../../../hooks/useComplaints';
-import { formatDate, formatDateTime, timeAgo } from '../../../utils/date';
+import { formatDate, timeAgo } from '../../../utils/date';
 import Card from '../../../components/ui/Card';
 import Badge from '../../../components/ui/Badge';
 import Button from '../../../components/ui/Button';
@@ -90,6 +90,25 @@ export default function MemberComplaintsListScreen() {
             </View>
             <Text style={[styles.responseText, { color: colors.text }]}>
               {item.owner_response}
+            </Text>
+          </View>
+        ) : item.status === 'resolved' ? (
+          // Management can close a complaint from the dashboard without typing a
+          // reply, so a resolved row usually has no owner_response at all. Without
+          // this branch the member saw a green "Resolved" badge and nothing else.
+          <View
+            style={[
+              styles.statusNoteBox,
+              {
+                backgroundColor: isDark ? 'rgba(0, 230, 118, 0.08)' : '#F0FAF5',
+                borderColor: isDark ? 'rgba(0, 230, 118, 0.25)' : '#C8E6C9',
+              },
+            ]}
+          >
+            <Ionicons name="checkmark-circle-outline" size={16} color={colors.success} />
+            <Text style={[styles.statusNoteText, { color: colors.success }]}>
+              Gym management marked this as resolved {timeAgo(item.updated_at)}. If the
+              issue hasn't been fixed, please submit it again.
             </Text>
           </View>
         ) : item.status === 'acknowledged' ? (

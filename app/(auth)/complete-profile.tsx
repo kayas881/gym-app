@@ -20,6 +20,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { useAppAuth } from '../../lib/auth';
 import { useTheme } from '../../lib/theme';
 import { uploadImageAsset, isLocalFileUri } from '../../lib/storage';
+import { dateOfBirthError, parseIndianDate, toIndianDate } from '../../utils/date';
 import { Input, Button } from '../../components/ui';
 
 // Options for dropdowns.
@@ -35,6 +36,20 @@ const GENDER_OPTIONS: SelectOption[] = [
   { label: 'Female', value: 'female' },
   { label: 'Other', value: 'other' },
   { label: 'Prefer not to say', value: 'prefer_not_to_say' },
+];
+
+/**
+ * Must stay exactly these three values: announcement_recipients() matches
+ * preferred_gym_timing against 'morning' / 'afternoon' / 'evening' to decide who
+ * a slot-targeted announcement reaches. This used to be a free-text box whose
+ * placeholder suggested "e.g. 6-8 AM or 6-8 PM", so anyone who followed the hint
+ * typed a value matching no slot and was then silently left out of every
+ * slot-targeted announcement.
+ */
+const GYM_TIMING_OPTIONS: SelectOption[] = [
+  { label: 'Morning', value: 'morning' },
+  { label: 'Afternoon', value: 'afternoon' },
+  { label: 'Evening', value: 'evening' },
 ];
 
 const FITNESS_GOAL_OPTIONS: SelectOption[] = [
@@ -203,7 +218,8 @@ export default function CompleteProfileScreen() {
   // Form State
   const [fullName, setFullName] = useState(profile?.full_name || '');
   const [phone, setPhone] = useState(profile?.phone || '');
-  const [dob, setDob] = useState(profile?.date_of_birth || '');
+  // Held in the day-first form the user sees; converted to ISO on save.
+  const [dob, setDob] = useState(toIndianDate(profile?.date_of_birth));
   const [gender, setGender] = useState(profile?.gender || '');
   const [emergencyName, setEmergencyName] = useState(
     profile?.emergency_contact_name || ''
@@ -235,7 +251,7 @@ export default function CompleteProfileScreen() {
     if (profile) {
       if (!fullName && profile.full_name) setFullName(profile.full_name);
       if (!phone && profile.phone) setPhone(profile.phone);
-      if (!dob && profile.date_of_birth) setDob(profile.date_of_birth);
+      if (!dob && profile.date_of_birth) setDob(toIndianDate(profile.date_of_birth));
       if (!gender && profile.gender) setGender(profile.gender);
       if (!emergencyName && profile.emergency_contact_name)
         setEmergencyName(profile.emergency_contact_name);
@@ -302,6 +318,15 @@ export default function CompleteProfileScreen() {
     }
     setPhoneError('');
 
+    // Free-text field writing to a Postgres `date`. This is the signup step
+    // every user passes through, so an unchecked day-first date failed the
+    // whole profile save here with a raw 22007/22008 from the driver.
+    const dobError = dateOfBirthError(dob);
+    if (dobError) {
+      Alert.alert('Check your date of birth', dobError);
+      return;
+    }
+
     if (!userId) {
       Alert.alert('Error', 'User ID not found. Please sign in again.');
       return;
@@ -343,7 +368,7 @@ export default function CompleteProfileScreen() {
         full_name: fullName.trim(),
         phone: phone.trim() || null,
         photo_url: photoUrlToSave || null,
-        date_of_birth: dob.trim() || null,
+        date_of_birth: parseIndianDate(dob),
         gender: gender || null,
         emergency_contact_name: emergencyName.trim() || null,
         emergency_contact_phone: emergencyPhone.trim() || null,
@@ -532,8 +557,8 @@ export default function CompleteProfileScreen() {
           />
 
           <Input
-            label="Date of Birth"
-            placeholder="YYYY-MM-DD (e.g. 1998-05-21)"
+            label="Date of Birth (DD/MM/YYYY)"
+            placeholder="e.g. 21/05/1998"
             value={dob}
             onChangeText={setDob}
             autoCapitalize="none"
@@ -606,12 +631,12 @@ export default function CompleteProfileScreen() {
             }
           />
 
-          <Input
+          <SelectField
             label="Preferred Gym Timing"
-            placeholder="e.g. 6-8 AM or 6-8 PM"
             value={preferredTiming}
-            onChangeText={setPreferredTiming}
-            autoCapitalize="none"
+            placeholder="Select when you usually train"
+            options={GYM_TIMING_OPTIONS}
+            onSelect={setPreferredTiming}
             leftIcon={
               <Ionicons
                 name="time-outline"

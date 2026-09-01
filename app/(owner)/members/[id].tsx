@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   View,
   Text,
@@ -21,13 +21,24 @@ import Badge from '../../../components/ui/Badge';
 import Button from '../../../components/ui/Button';
 import Input from '../../../components/ui/Input';
 import StatusBadge from '../../../components/ui/StatusBadge';
-import { daysRemaining, formatDate, formatDateTime, today, localDateOf } from '../../../utils/date';
+import { useToday } from '../../../hooks/useToday';
+import {
+  daysRemaining,
+  formatDate,
+  formatDateTime,
+  today,
+  localDateOf,
+  renewalStartDate,
+  isValidDateString,
+  parseIndianDate,
+  toIndianDate,
+} from '../../../utils/date';
 
 interface MemberDetail {
   id: string;
   gym_id: string;
   role: 'owner' | 'staff' | 'member';
-  status: 'pending' | 'active' | 'expired' | 'rejected';
+  status: 'pending' | 'active' | 'expired' | 'rejected' | 'removed';
   preferred_time_slot: string | null;
   auto_time_slot: string | null;
   joined_at: string;
@@ -56,7 +67,7 @@ interface MembershipPlan {
 }
 
 export default function MemberDetailScreen() {
-  const { id } = useLocalSearchParams<{ id: string }>();
+  const { id, action } = useLocalSearchParams<{ id: string; action?: string }>();
   const router = useRouter();
   const { supabase, gymId, isSignedIn } = useAppAuth();
   const { colors, isDark } = useTheme();
@@ -70,6 +81,8 @@ export default function MemberDetailScreen() {
   const {
     subscriptions,
     activeSubscription,
+    upcomingSubscription,
+    coverageEndDate,
     loading: subsLoading,
     refresh: refreshSubs,
     createSubscription,
@@ -81,7 +94,23 @@ export default function MemberDetailScreen() {
   const [selectedPlanId, setSelectedPlanId] = useState<string>('');
   const [amountPaid, setAmountPaid] = useState<string>('');
   const [paymentMethod, setPaymentMethod] = useState<'cash' | 'upi' | 'online'>('cash');
+  // startDate stays ISO YYYY-MM-DD: it is compared as a string against
+  // coverageEndDate and passed to record_subscription_payment, both of which
+  // rely on ISO ordering. startDateText is the day-first form shown in the box.
   const [startDate, setStartDate] = useState<string>(today());
+  const [startDateText, setStartDateText] = useState<string>(toIndianDate(today()));
+
+  const applyStartDate = (iso: string) => {
+    setStartDate(iso);
+    setStartDateText(toIndianDate(iso));
+  };
+
+  // Blank the ISO value while the typed text is incomplete, so the
+  // isValidDateString guards still stop a bad submit.
+  const onStartDateTextChange = (text: string) => {
+    setStartDateText(text);
+    setStartDate(parseIndianDate(text) ?? '');
+  };
   const [savingPayment, setSavingPayment] = useState(false);
 
   // Recent check-ins for this member (Phase 2 item 5). This was deferred until
@@ -92,15 +121,24 @@ export default function MemberDetailScreen() {
   // Open renewal request, so the owner can see the member asked for a specific
   // plan before recording a payment. record_subscription_payment closes it.
   const [renewalRequest, setRenewalRequest] = useState<
-    { id: string; plan: { name: string; price: number; duration_months: number } | null } | null
+    {
+      id: string;
+      plan_id: string;
+      plan: { name: string; price: number; duration_months: number } | null;
+    } | null
   >(null);
+
+  // Distinguishes "no open request" from "not fetched yet". Without it the
+  // auto-open below could fire between the plans arriving and the request
+  // arriving, preselecting plans[0] — the 1-month bug this is meant to fix.
+  const [renewalFetched, setRenewalFetched] = useState(false);
 
   const fetchRenewalRequest = useCallback(async () => {
     if (!id || !isSignedIn) return;
     try {
       const { data, error } = await supabase
         .from('renewal_requests')
-        .select('id, plan:membership_plans ( name, price, duration_months )')
+        .select('id, plan_id, plan:membership_plans ( name, price, duration_months )')
         .eq('gym_member_id', id)
         .eq('status', 'pending')
         .maybeSingle();
@@ -109,9 +147,12 @@ export default function MemberDetailScreen() {
         console.warn('[MemberDetail] Renewal request fetch:', error.message);
         return;
       }
+
       setRenewalRequest((data as any) ?? null);
     } catch (err) {
       console.warn('[MemberDetail] Renewal request error:', err);
+    } finally {
+      setRenewalFetched(true);
     }
   }, [id, supabase, isSignedIn]);
 
@@ -346,6 +387,126 @@ export default function MemberDetailScreen() {
     );
   };
 
+  // Renewing early must extend the membership, not restart it — the RPC
+  // expires the old subscription, so a start date of today would delete the
+  // remaining paid days. See renewalStartDate().
+  //
+  // The plan defaults to whatever the member ASKED for. fetchPlans seeds
+  // selectedPlanId with plans[0] (the shortest, since it orders by duration),
+  // so a member who requested 3 Months had 1 Month preselected — one careless
+  // tap away from charging them for the wrong plan.
+  const openPaymentModal = useCallback(() => {
+    applyStartDate(renewalStartDate(activeSubscription?.end_date));
+
+    const requestedPlan =
+      renewalRequest?.plan_id &&
+      availablePlans.find((p) => p.id === renewalRequest.plan_id);
+
+    if (requestedPlan) {
+      setSelectedPlanId(requestedPlan.id);
+      setAmountPaid(requestedPlan.price.toString());
+    }
+
+    setPaymentModalVisible(true);
+  }, [activeSubscription?.end_date, renewalRequest?.plan_id, availablePlans]);
+
+  // `?action=record` from the renewal queue. Waits for the plans and the
+  // request to load, or the preselection above would have nothing to match
+  // against. The ref keeps it to once per visit so dismissing the sheet
+  // doesn't immediately reopen it.
+  const autoOpenedRef = useRef(false);
+  useEffect(() => {
+    if (autoOpenedRef.current) return;
+    if (action !== 'record') return;
+    if (loading || availablePlans.length === 0) return;
+    if (!renewalFetched) return;
+
+    autoOpenedRef.current = true;
+    openPaymentModal();
+  }, [action, loading, availablePlans.length, renewalFetched, openPaymentModal]);
+
+  // Removing a member who has left the gym. Until this existed, 'rejected'
+  // was only reachable while status was 'pending', so an approved member could
+  // never be taken off the roster: they kept counting toward the dashboard and
+  // kept receiving the gym's push notifications forever.
+  //
+  // Goes through an RPC because the status flip, expiring their subscription
+  // and dropping any pending renewal request have to happen together --
+  // see 022_remove_gym_member.sql.
+  const handleRemove = () => {
+    if (!member) return;
+
+    if (member.role === 'owner') {
+      Alert.alert(
+        'Cannot Remove Owner',
+        'This is the gym owner account and cannot be removed from the gym.'
+      );
+      return;
+    }
+
+    const name = member.profile?.full_name || 'this member';
+    Alert.alert(
+      'Remove from gym?',
+      `${name} will be taken off the roster: no check-ins, no announcements, and they stop counting toward your member totals.\n\nTheir payment history is kept, and you can restore them from the Removed filter.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Remove',
+          style: 'destructive',
+          onPress: async () => {
+            setActionLoading(true);
+            try {
+              const { error } = await supabase.rpc('remove_gym_member', {
+                p_gym_member_id: id,
+              });
+              if (error) throw error;
+              Alert.alert('Removed', `${name} is no longer a member of this gym.`);
+              fetchMemberDetail();
+              refreshSubs();
+              fetchRenewalRequest();
+            } catch (e: any) {
+              Alert.alert('Error', e.message || 'Failed to remove member.');
+            } finally {
+              setActionLoading(false);
+            }
+          },
+        },
+      ]
+    );
+  };
+
+  const handleRestore = () => {
+    if (!member) return;
+    const name = member.profile?.full_name || 'this member';
+
+    Alert.alert(
+      'Restore member?',
+      `${name} will be back on the roster. Their subscription stays expired, so record a payment to give them an active plan.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Restore',
+          onPress: async () => {
+            setActionLoading(true);
+            try {
+              const { error } = await supabase.rpc('restore_gym_member', {
+                p_gym_member_id: id,
+              });
+              if (error) throw error;
+              Alert.alert('Restored', `${name} is a member again.`);
+              fetchMemberDetail();
+              refreshSubs();
+            } catch (e: any) {
+              Alert.alert('Error', e.message || 'Failed to restore member.');
+            } finally {
+              setActionLoading(false);
+            }
+          },
+        },
+      ]
+    );
+  };
+
   const handleSelectPlan = (planId: string) => {
     setSelectedPlanId(planId);
     const plan = availablePlans.find((p) => p.id === planId);
@@ -354,7 +515,17 @@ export default function MemberDetailScreen() {
     }
   };
 
-  const handleRecordPaymentSubmit = async () => {
+  // True when the chosen start date lands inside time the member has already
+  // paid for. The RPC expires whatever the new period overlaps, so saving here
+  // gives up the remainder of the existing plan.
+  const overlapsPaidTime = !!(
+    coverageEndDate &&
+    startDate &&
+    isValidDateString(startDate) &&
+    startDate <= coverageEndDate
+  );
+
+  const submitPayment = async () => {
     if (!id || !selectedPlanId) {
       Alert.alert('Required', 'Please select a membership plan.');
       return;
@@ -363,6 +534,13 @@ export default function MemberDetailScreen() {
     const numAmount = parseFloat(amountPaid);
     if (isNaN(numAmount) || numAmount < 0) {
       Alert.alert('Invalid Amount', 'Please enter a valid payment amount.');
+      return;
+    }
+
+    // This is a free-text field, so "31-08-2026" and "2026-02-30" both reach
+    // it. Postgres would reject them with a raw 22007/22008 error.
+    if (startDate && !isValidDateString(startDate)) {
+      Alert.alert('Invalid Start Date', 'Please enter the start date as DD/MM/YYYY.');
       return;
     }
 
@@ -390,6 +568,47 @@ export default function MemberDetailScreen() {
     }
   };
 
+  const handleRecordPaymentSubmit = () => {
+    if (!id || !selectedPlanId) {
+      Alert.alert('Required', 'Please select a membership plan.');
+      return;
+    }
+
+    const numAmount = parseFloat(amountPaid);
+    if (isNaN(numAmount) || numAmount < 0) {
+      Alert.alert('Invalid Amount', 'Please enter a valid payment amount.');
+      return;
+    }
+
+    if (startDate && !isValidDateString(startDate)) {
+      Alert.alert('Invalid Start Date', 'Please enter the start date as DD/MM/YYYY.');
+      return;
+    }
+
+    // This is how a member silently lost 4 months of a 6-month plan: a payment
+    // recorded with an overlapping start date voided the earlier one with no
+    // warning anywhere in the app.
+    if (overlapsPaidTime && coverageEndDate) {
+      Alert.alert(
+        'This replaces paid time',
+        `${member?.profile?.full_name || 'This member'} is already paid up to ${formatDate(
+          coverageEndDate
+        )}. Starting a new plan on ${formatDate(
+          startDate
+        )} replaces that plan, and the remaining days are lost.\n\nTo add time instead, set the start date to the day after ${formatDate(
+          coverageEndDate
+        )}.`,
+        [
+          { text: 'Cancel', style: 'cancel' },
+          { text: 'Replace anyway', style: 'destructive', onPress: submitPayment },
+        ]
+      );
+      return;
+    }
+
+    submitPayment();
+  };
+
   if (loading) {
     return (
       <View style={[styles.screen, styles.centered, { backgroundColor: colors.background }]}>
@@ -411,8 +630,21 @@ export default function MemberDetailScreen() {
     );
   }
 
-  const daysLeft = activeSubscription ? daysRemaining(activeSubscription.end_date) : 0;
-  const isExp = activeSubscription ? daysLeft === 0 : true;
+  // Re-renders when the local day changes or the screen regains focus, so the
+  // day count below cannot sit frozen on a screen left open.
+  useToday();
+
+  // Count down to coverageEndDate, NOT activeSubscription.end_date. A member who
+  // renews early holds two active subscriptions, and access ends at the later
+  // one -- reading the current row showed Aman "90 Days Left" when he was paid
+  // through to 01/03/2027, which would have had the owner chasing him for a
+  // renewal he had already bought.
+  const daysLeft = coverageEndDate ? daysRemaining(coverageEndDate) : 0;
+  const isExp = coverageEndDate ? daysLeft === 0 : true;
+
+  // An approved member who has never paid, or whose plan lapsed.
+  const hasNoPlan =
+    !subsLoading && !activeSubscription && member.role === 'member' && member.status !== 'pending';
 
   return (
     <View style={[styles.screen, { backgroundColor: colors.background }]}>
@@ -459,7 +691,16 @@ export default function MemberDetailScreen() {
               </Text>
 
               <View style={styles.badgeRow}>
-                <StatusBadge status={member.status} />
+                {/* gym_members.status only says "approved to enter the gym",
+                    not "paid up" — so an approved member with no subscription
+                    was showing a green Active badge directly above "No active
+                    membership subscription." Same confusion the dashboard's
+                    member count had. */}
+                {hasNoPlan ? (
+                  <Badge text="NO PLAN" variant="warning" size="sm" />
+                ) : (
+                  <StatusBadge status={member.status} />
+                )}
                 <Badge
                   text={member.role.toUpperCase()}
                   variant={member.role === 'owner' ? 'warning' : member.role === 'staff' ? 'info' : 'default'}
@@ -500,7 +741,7 @@ export default function MemberDetailScreen() {
                   title="Record Payment / Renew"
                   variant="primary"
                   icon={<Ionicons name="cash-outline" size={18} color="#FFFFFF" />}
-                  onPress={() => setPaymentModalVisible(true)}
+                  onPress={openPaymentModal}
                   fullWidth
                 />
                 <Button
@@ -519,9 +760,52 @@ export default function MemberDetailScreen() {
                 title="Record Payment to Renew"
                 variant="primary"
                 icon={<Ionicons name="refresh-outline" size={18} color="#FFFFFF" />}
-                onPress={() => setPaymentModalVisible(true)}
+                onPress={openPaymentModal}
                 fullWidth
               />
+            )}
+
+            {/* Leaving the gym is not the same as being rejected at the door,
+                so this sits apart from the pending Approve/Reject pair. Hidden
+                for the owner's own row, which the RPC also refuses. */}
+            {(member.status === 'active' || member.status === 'expired') &&
+              member.role !== 'owner' && (
+                <TouchableOpacity
+                  onPress={handleRemove}
+                  disabled={actionLoading}
+                  activeOpacity={0.7}
+                  style={styles.removeLink}
+                >
+                  <Ionicons name="person-remove-outline" size={16} color={colors.error} />
+                  <Text style={[styles.removeLinkText, { color: colors.error }]}>
+                    Remove from gym
+                  </Text>
+                </TouchableOpacity>
+              )}
+
+            {member.status === 'removed' && (
+              <View>
+                <View
+                  style={[
+                    styles.removedNotice,
+                    { borderColor: colors.border, backgroundColor: colors.surfaceElevated },
+                  ]}
+                >
+                  <Ionicons name="information-circle-outline" size={18} color={colors.textSecondary} />
+                  <Text style={[styles.removedNoticeText, { color: colors.textSecondary }]}>
+                    Removed from the gym: no check-ins and no announcements.
+                    The payment history below is kept.
+                  </Text>
+                </View>
+                <Button
+                  title="Restore Member"
+                  variant="outline"
+                  loading={actionLoading}
+                  onPress={handleRestore}
+                  fullWidth
+                  style={{ marginTop: 10 }}
+                />
+              </View>
             )}
           </View>
         </Card>
@@ -567,6 +851,26 @@ export default function MemberDetailScreen() {
                   </Text>
                 </View>
               </View>
+
+              {/* Without this the dates above and the "N Days Left" badge look
+                  like they contradict each other: the grid shows the plan running
+                  today, the badge counts to the end of everything paid for. */}
+              {upcomingSubscription ? (
+                <View style={styles.renewedRow}>
+                  <Ionicons name="arrow-forward-circle-outline" size={16} color={colors.primary} />
+                  <Text style={[styles.renewedText, { color: colors.textSecondary }]}>
+                    Already renewed —{' '}
+                    <Text style={{ color: colors.text, fontWeight: '700' }}>
+                      {upcomingSubscription.plan?.name || 'next plan'}
+                    </Text>{' '}
+                    takes over {formatDate(upcomingSubscription.start_date)} and runs to{' '}
+                    <Text style={{ color: colors.text, fontWeight: '700' }}>
+                      {formatDate(upcomingSubscription.end_date)}
+                    </Text>
+                    .
+                  </Text>
+                </View>
+              ) : null}
             </View>
           ) : (
             <View style={styles.noPlanContainer}>
@@ -578,7 +882,7 @@ export default function MemberDetailScreen() {
                 title="Assign Plan"
                 size="sm"
                 variant="outline"
-                onPress={() => setPaymentModalVisible(true)}
+                onPress={openPaymentModal}
                 style={{ marginTop: 8 }}
               />
             </View>
@@ -760,8 +1064,19 @@ export default function MemberDetailScreen() {
                 <Text style={[styles.subDateText, { color: colors.textSecondary }]}>
                   {formatDate(sub.start_date)} - {formatDate(sub.end_date)}
                 </Text>
+                {/* record_subscription_payment marks the previous subscription
+                    'expired' whenever a new one is recorded. If its end date
+                    hasn't arrived yet it wasn't expired, it was replaced by a
+                    renewal — labelling it EXPIRED reads like the member lost
+                    time they paid for. */}
                 <Badge
-                  text={sub.status.toUpperCase()}
+                  text={
+                    sub.status === 'active'
+                      ? 'ACTIVE'
+                      : sub.end_date >= today()
+                        ? 'REPLACED'
+                        : 'EXPIRED'
+                  }
                   variant={sub.status === 'active' ? 'success' : 'default'}
                   size="sm"
                 />
@@ -776,7 +1091,9 @@ export default function MemberDetailScreen() {
             Attendance
           </Text>
           <Text style={[styles.sectionSubtitle, { color: colors.textSecondary }]}>
-            {checkIns.length} check-ins
+            {/* The query limits to 30, so "30 check-ins" would understate a
+                long-standing member's real total. */}
+            {checkIns.length === 30 ? 'Last 30' : `${checkIns.length} check-ins`}
           </Text>
         </View>
 
@@ -843,6 +1160,22 @@ export default function MemberDetailScreen() {
             </View>
 
             <ScrollView showsVerticalScrollIndicator={false}>
+              {renewalRequest?.plan ? (
+                <View
+                  style={[
+                    styles.requestedBanner,
+                    { backgroundColor: colors.primaryMuted, borderColor: colors.primary },
+                  ]}
+                >
+                  <Ionicons name="checkmark-circle" size={16} color={colors.primary} />
+                  <Text style={[styles.requestedBannerText, { color: colors.text }]}>
+                    {member.profile?.full_name?.split(' ')[0] || 'The member'} asked for{' '}
+                    <Text style={{ fontWeight: '800' }}>{renewalRequest.plan.name}</Text>
+                    {' '}(₹{renewalRequest.plan.price}) — preselected below.
+                  </Text>
+                </View>
+              ) : null}
+
               <Text style={[styles.inputGroupLabel, { color: colors.textSecondary }]}>
                 Select Membership Plan
               </Text>
@@ -926,11 +1259,34 @@ export default function MemberDetailScreen() {
               </View>
 
               <Input
-                label="Start Date (YYYY-MM-DD)"
-                placeholder="YYYY-MM-DD"
-                value={startDate}
-                onChangeText={setStartDate}
+                label="Start Date (DD/MM/YYYY)"
+                placeholder="e.g. 01/09/2026"
+                value={startDateText}
+                onChangeText={onStartDateTextChange}
               />
+
+              {overlapsPaidTime && coverageEndDate ? (
+                <View
+                  style={[
+                    styles.overlapWarning,
+                    { borderColor: colors.warning, backgroundColor: colors.surfaceElevated },
+                  ]}
+                >
+                  <Ionicons name="warning-outline" size={16} color={colors.warning} />
+                  <Text style={[styles.overlapWarningText, { color: colors.warning }]}>
+                    Already paid up to {formatDate(coverageEndDate)}. This start date
+                    replaces that plan and loses the remaining days. Use{' '}
+                    {formatDate(renewalStartDate(coverageEndDate))} to add time instead.
+                  </Text>
+                </View>
+              ) : null}
+
+              {activeSubscription && startDate !== today() ? (
+                <Text style={[styles.startDateHint, { color: colors.textSecondary }]}>
+                  Starts the day after the current plan ends ({formatDate(activeSubscription.end_date)}),
+                  so the remaining days aren't lost.
+                </Text>
+              ) : null}
 
               <View style={styles.modalActionsRow}>
                 <Button
@@ -1279,5 +1635,68 @@ const styles = StyleSheet.create({
   },
   modalBtn: {
     flex: 1,
+  },
+  removeLink: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingVertical: 12,
+    marginTop: 4,
+  },
+  removeLinkText: {
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  removedNotice: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 8,
+    borderWidth: 1,
+    borderRadius: 12,
+    padding: 12,
+  },
+  removedNoticeText: {
+    flex: 1,
+    fontSize: 12,
+    lineHeight: 17,
+  },
+  overlapWarning: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 8,
+    borderWidth: 1,
+    borderRadius: 10,
+    padding: 10,
+    marginTop: -8,
+    marginBottom: 14,
+  },
+  overlapWarningText: { flex: 1, fontSize: 12, lineHeight: 17 },
+  requestedBanner: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 8,
+    borderWidth: 1,
+    borderRadius: 10,
+    padding: 10,
+    marginBottom: 14,
+  },
+  requestedBannerText: { flex: 1, fontSize: 12, lineHeight: 17 },
+  renewedRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 8,
+    marginTop: 12,
+  },
+  renewedText: {
+    flex: 1,
+    fontSize: 12,
+    lineHeight: 17,
+  },
+  startDateHint: {
+    fontSize: 12,
+    lineHeight: 17,
+    marginTop: -8,
+    marginBottom: 14,
   },
 });

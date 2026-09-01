@@ -57,8 +57,11 @@ export default function IndexScreen() {
       return;
     }
 
-    // If active membership, route based on role
-    if (currentMembership.status === 'active') {
+    // Route on role for anyone still attached to the gym. 'expired' is
+    // included deliberately: a lapsed member needs to reach their home screen
+    // to see the expiry banner and renew. Previously they fell through this
+    // block entirely and sat on a blank index forever.
+    if (currentMembership.status === 'active' || currentMembership.status === 'expired') {
       if (role === 'owner') {
         router.replace('/(owner)/dashboard');
       } else if (role === 'staff') {

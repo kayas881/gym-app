@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useSupabase } from './useSupabase';
 import { useAppAuth } from '../lib/auth';
+import { today } from '../utils/date';
 
 interface Subscription {
   id: string;
@@ -34,6 +35,18 @@ export function useSubscriptions(gymMemberId?: string) {
   const { gymId } = useAppAuth();
   const [subscriptions, setSubscriptions] = useState<Subscription[]>([]);
   const [activeSubscription, setActiveSubscription] = useState<Subscription | null>(null);
+  /**
+   * A paid period that hasn't begun yet — what an early renewal creates.
+   * Non-null means the member is renewed and continues past
+   * activeSubscription.end_date.
+   */
+  const [upcomingSubscription, setUpcomingSubscription] = useState<Subscription | null>(null);
+  /**
+   * The last date the member is covered to, across every non-superseded
+   * subscription. This — not activeSubscription.end_date — is the honest
+   * answer to "when do I lose access".
+   */
+  const [coverageEndDate, setCoverageEndDate] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -71,9 +84,35 @@ export function useSubscriptions(gymMemberId?: string) {
       const subs = (data ?? []) as Subscription[];
       setSubscriptions(subs);
 
-      // Find the active subscription
-      const active = subs.find((s) => s.status === 'active');
-      setActiveSubscription(active ?? null);
+      // Since migration 024 a member can hold two 'active' subscriptions at
+      // once: the period covering today, and the early renewal that starts
+      // when it ends. `subs.find(s => s.status === 'active')` on a
+      // created_at-descending list therefore picked the FUTURE one — which is
+      // how a member paid up to 30 Nov ended up looking at a plan dated
+      // "1 Dec - 1 Mar" with progress stuck at 0%.
+      const todayStr = today();
+      const activeSubs = subs.filter((s) => s.status === 'active');
+
+      const covering = activeSubs
+        .filter((s) => s.start_date <= todayStr && s.end_date >= todayStr)
+        // If two overlap, the one running longest is the member's real cover.
+        .sort((a, b) => (a.end_date < b.end_date ? 1 : -1))[0];
+
+      const upcoming = activeSubs
+        .filter((s) => s.start_date > todayStr)
+        .sort((a, b) => (a.start_date > b.start_date ? 1 : -1))[0];
+
+      // Falls back to the upcoming one so a member who has paid ahead of their
+      // first day sees their plan rather than "no membership".
+      setActiveSubscription(covering ?? upcoming ?? null);
+      setUpcomingSubscription(covering ? (upcoming ?? null) : null);
+
+      setCoverageEndDate(
+        activeSubs.reduce<string | null>(
+          (latest, s) => (latest === null || s.end_date > latest ? s.end_date : latest),
+          null
+        )
+      );
     } catch (err) {
       setError('Failed to fetch subscriptions');
       console.error('[useSubscriptions]', err);
@@ -141,6 +180,8 @@ export function useSubscriptions(gymMemberId?: string) {
   return {
     subscriptions,
     activeSubscription,
+    upcomingSubscription,
+    coverageEndDate,
     loading,
     error,
     refresh: fetchSubscriptions,

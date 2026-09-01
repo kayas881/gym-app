@@ -10,12 +10,13 @@ import {
   ActivityIndicator,
   StyleSheet,
 } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useRouter, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useAppAuth } from '../../lib/auth';
 import { useTheme } from '../../lib/theme';
 import { useStaffChat } from '../../hooks/useStaffChat';
 import Avatar from '../../components/ui/Avatar';
+import { messageGrouping } from '../../utils/chat-grouping';
 import { formatDateTime } from '../../utils/date';
 
 export default function OwnerStaffChatScreen() {
@@ -60,6 +61,21 @@ export default function OwnerStaffChatScreen() {
     }
   }, [messages.length]);
 
+  // Jump to the newest message whenever the screen is opened.
+  //
+  // This is a tab, so it stays mounted and previously reopened wherever you
+  // last scrolled to — which for a chat reads as stale. Doing it on FOCUS only
+  // (not on message arrival) keeps the earlier fix intact: an incoming message
+  // while you're reading history still leaves your position alone.
+  useFocusEffect(
+    useCallback(() => {
+      const timer = setTimeout(() => {
+        flatListRef.current?.scrollToEnd({ animated: false });
+      }, 120);
+      return () => clearTimeout(timer);
+    }, [])
+  );
+
   const handleSend = async () => {
     const text = inputText.trim();
     if (!text || isSending) return;
@@ -94,14 +110,23 @@ export default function OwnerStaffChatScreen() {
     }
   };
 
-  const renderMessageItem = ({ item }: { item: (typeof messages)[0] }) => {
+  const renderMessageItem = ({
+    item,
+    index,
+  }: {
+    item: (typeof messages)[0];
+    index: number;
+  }) => {
     const isMe = item.sender?.id === profile?.id;
     const senderName = item.sender?.full_name || 'Staff Member';
     const photoUrl = item.sender?.photo_url;
+    // A burst from one person collapses into one group: avatar and name on the
+    // first row, timestamp on the last.
+    const { showHeader, showTimestamp } = messageGrouping(messages, index);
 
     if (isMe) {
       return (
-        <View style={styles.myMessageRow}>
+        <View style={[styles.myMessageRow, !showTimestamp && styles.groupedRow]}>
           <View style={styles.myMessageWrapper}>
             <View
               style={[
@@ -113,21 +138,32 @@ export default function OwnerStaffChatScreen() {
                 {item.message}
               </Text>
             </View>
-            <Text style={[styles.myTimestamp, { color: colors.textTertiary }]}>
-              {formatMessageTime(item.created_at)}
-            </Text>
+            {showTimestamp ? (
+              <Text style={[styles.myTimestamp, { color: colors.textTertiary }]}>
+                {formatMessageTime(item.created_at)}
+              </Text>
+            ) : null}
           </View>
         </View>
       );
     }
 
     return (
-      <View style={styles.otherMessageRow}>
-        <Avatar uri={photoUrl} name={senderName} size={32} style={styles.otherAvatar} />
+      <View style={[styles.otherMessageRow, !showTimestamp && styles.groupedRow]}>
+        {showHeader ? (
+          <Avatar uri={photoUrl} name={senderName} size={32} style={styles.otherAvatar} />
+        ) : (
+          // Keeps grouped bubbles left-aligned with the first one.
+          <View style={styles.avatarSpacer} />
+        )}
         <View style={styles.otherMessageWrapper}>
-          <Text style={[styles.otherSenderName, { color: colors.primaryLight || colors.primary }]}>
-            {senderName}
-          </Text>
+          {showHeader ? (
+            <Text
+              style={[styles.otherSenderName, { color: colors.primaryLight || colors.primary }]}
+            >
+              {senderName}
+            </Text>
+          ) : null}
           <View
             style={[
               styles.otherBubble,
@@ -141,9 +177,11 @@ export default function OwnerStaffChatScreen() {
               {item.message}
             </Text>
           </View>
-          <Text style={[styles.otherTimestamp, { color: colors.textTertiary }]}>
-            {formatMessageTime(item.created_at)}
-          </Text>
+          {showTimestamp ? (
+            <Text style={[styles.otherTimestamp, { color: colors.textTertiary }]}>
+              {formatMessageTime(item.created_at)}
+            </Text>
+          ) : null}
         </View>
       </View>
     );
@@ -344,6 +382,9 @@ const styles = StyleSheet.create({
     alignItems: 'flex-end',
   },
   myBubble: {
+    // A one-character message ('K') collapsed to a circle at this
+    // border radius; a floor keeps every bubble readable as a bubble.
+    minWidth: 56,
     paddingHorizontal: 14,
     paddingVertical: 10,
     borderRadius: 18,
@@ -370,6 +411,14 @@ const styles = StyleSheet.create({
     marginRight: 8,
     marginTop: 16,
   },
+  // Avatar width (32) plus its right margin (8), so grouped bubbles line up.
+  avatarSpacer: {
+    width: 40,
+  },
+  // Rows inside a group sit tighter than the gap between groups.
+  groupedRow: {
+    marginBottom: 1,
+  },
   otherMessageWrapper: {
     flex: 1,
   },
@@ -380,6 +429,9 @@ const styles = StyleSheet.create({
     marginLeft: 4,
   },
   otherBubble: {
+    // A one-character message ('K') collapsed to a circle at this
+    // border radius; a floor keeps every bubble readable as a bubble.
+    minWidth: 56,
     paddingHorizontal: 14,
     paddingVertical: 10,
     borderRadius: 18,

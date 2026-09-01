@@ -15,6 +15,7 @@ import { useAppAuth } from '../../lib/auth';
 import { useTheme } from '../../lib/theme';
 import { useCheckIns } from '../../hooks/useCheckIns';
 import { formatDate, timeAgo } from '../../utils/date';
+import { TIME_SLOTS } from '../../constants/config';
 import Avatar from '../../components/ui/Avatar';
 import Badge from '../../components/ui/Badge';
 import Card from '../../components/ui/Card';
@@ -66,21 +67,33 @@ export default function StaffHomeScreen() {
     loadData();
   }, [loadData]);
 
-  // Slot breakdowns for today
+  // Slot breakdowns for today, using the same boundaries as the database.
   const slotCounts = useMemo(() => {
     let morning = 0;
     let afternoon = 0;
     let evening = 0;
+    let outside = 0;
 
     attendanceList.forEach((item) => {
       const hour = new Date(item.checked_in_at).getHours();
-      if (hour >= 5 && hour < 11) morning++;
-      else if (hour >= 11 && hour < 16) afternoon++;
-      else if (hour >= 16 && hour < 22) evening++;
+      if (hour >= TIME_SLOTS.morning.start && hour < TIME_SLOTS.morning.end) morning++;
+      else if (hour >= TIME_SLOTS.afternoon.start && hour < TIME_SLOTS.afternoon.end) afternoon++;
+      else if (hour >= TIME_SLOTS.evening.start && hour < TIME_SLOTS.evening.end) evening++;
+      else outside++;
     });
 
-    return { morning, afternoon, evening };
+    return { morning, afternoon, evening, outside };
   }, [attendanceList]);
+
+  /** "5 AM – 11 AM" from the constant, so a label can't drift from its count. */
+  const slotLabel = (slot: keyof typeof TIME_SLOTS) => {
+    const to12 = (h: number) => {
+      const suffix = h < 12 || h === 24 ? 'AM' : 'PM';
+      const hour12 = h % 12 === 0 ? 12 : h % 12;
+      return `${hour12} ${suffix}`;
+    };
+    return `${to12(TIME_SLOTS[slot].start)} – ${to12(TIME_SLOTS[slot].end)}`;
+  };
 
   const todayFormatted = new Date().toLocaleDateString('en-IN', {
     weekday: 'long',
@@ -188,7 +201,7 @@ export default function StaffHomeScreen() {
                 <StatCard
                   title="Morning Slot"
                   value={slotCounts.morning}
-                  subtitle="5 AM – 11 AM"
+                  subtitle={slotLabel('morning')}
                   icon="sunny-outline"
                   color={colors.warning}
                   style={styles.statHalf}
@@ -199,7 +212,7 @@ export default function StaffHomeScreen() {
                 <StatCard
                   title="Afternoon Slot"
                   value={slotCounts.afternoon}
-                  subtitle="11 AM – 4 PM"
+                  subtitle={slotLabel('afternoon')}
                   icon="partly-sunny-outline"
                   color={colors.info}
                   style={styles.statHalf}
@@ -207,15 +220,32 @@ export default function StaffHomeScreen() {
                 <StatCard
                   title="Evening Slot"
                   value={slotCounts.evening}
-                  // TIME_SLOTS.evening is { start: 16, end: 21 } — 4:00 to
-                  // 8:59 PM. The label previously claimed 10 PM, implying two
-                  // hours that are counted in no slot at all.
-                  subtitle="4 PM – 9 PM"
+                  subtitle={slotLabel('evening')}
                   icon="moon-outline"
                   color={colors.statusActive}
                   style={styles.statHalf}
                 />
               </View>
+
+              {/* This gym closes at 22:00 but the slots stop at 21:00, so a
+                  late check-in belongs to none of them. Without this row the
+                  three slot cards can read 0/0/0 while Total Today says 1, and
+                  staff have no way to tell that from a broken screen. */}
+              {slotCounts.outside > 0 ? (
+                <View
+                  style={[
+                    styles.outsideSlotRow,
+                    { backgroundColor: colors.surfaceElevated, borderColor: colors.border },
+                  ]}
+                >
+                  <Ionicons name="time-outline" size={16} color={colors.textSecondary} />
+                  <Text style={[styles.outsideSlotText, { color: colors.textSecondary }]}>
+                    {slotCounts.outside}{' '}
+                    {slotCounts.outside === 1 ? 'check-in' : 'check-ins'} outside the
+                    morning/afternoon/evening windows
+                  </Text>
+                </View>
+              ) : null}
             </View>
 
             {/* Quick Actions for Staff */}
@@ -230,6 +260,20 @@ export default function StaffHomeScreen() {
               >
                 <Ionicons name="qr-code" size={20} color={colors.success} />
                 <Text style={[styles.quickNavText, { color: colors.text }]}>Check-In Code</Text>
+              </TouchableOpacity>
+
+              {/* Staff are the ones at the desk when the owner is not, so they
+                  need to be able to hand out the join code themselves. */}
+              <TouchableOpacity
+                style={[
+                  styles.quickNavBtn,
+                  { backgroundColor: colors.surface, borderColor: colors.border },
+                ]}
+                onPress={() => router.push('/(staff)/invite')}
+                activeOpacity={0.7}
+              >
+                <Ionicons name="person-add" size={20} color={colors.warning} />
+                <Text style={[styles.quickNavText, { color: colors.text }]}>Invite Members</Text>
               </TouchableOpacity>
 
               <TouchableOpacity
@@ -312,6 +356,17 @@ export default function StaffHomeScreen() {
 }
 
 const styles = StyleSheet.create({
+  outsideSlotRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    borderWidth: 1,
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    marginTop: 4,
+  },
+  outsideSlotText: { flex: 1, fontSize: 12, lineHeight: 17 },
   container: {
     flex: 1,
   },

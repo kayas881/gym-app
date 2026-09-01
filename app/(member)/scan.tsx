@@ -27,6 +27,10 @@ export default function MemberScanScreen() {
   const { gymId, currentMembership } = useAppAuth();
   const { colors, isDark } = useTheme();
 
+  // 'removed' and 'rejected' never load a membership at all (lib/auth), so in
+  // practice this catches 'expired' and 'pending'.
+  const canCheckIn = currentMembership?.status === 'active';
+
   const {
     hasCheckedInToday,
     checkIn,
@@ -177,6 +181,60 @@ export default function MemberScanScreen() {
       setIsProcessing(false);
     }
   };
+
+  // Not entitled to check in. Shown before the camera is even requested, so
+  // the member is told why rather than being sent to scan something that will
+  // be refused by the database.
+  if (!canCheckIn && !successData) {
+    const isPending = currentMembership?.status === 'pending';
+
+    return (
+      <View style={[styles.container, styles.centerContent, { backgroundColor: colors.background }]}>
+        <View
+          style={[
+            styles.successCircle,
+            {
+              backgroundColor: isPending
+                ? (isDark ? 'rgba(255, 179, 0, 0.15)' : '#FFF8E1')
+                : (isDark ? 'rgba(255, 82, 82, 0.15)' : '#FFEBEE'),
+            },
+          ]}
+        >
+          <Ionicons
+            name={isPending ? 'hourglass-outline' : 'lock-closed-outline'}
+            size={56}
+            color={isPending ? colors.warning : colors.error}
+          />
+        </View>
+        <Text style={[styles.successTitle, { color: colors.text }]}>
+          {isPending ? 'Membership Pending' : 'Check-In Unavailable'}
+        </Text>
+        <Text style={[styles.successSubtitle, { color: colors.textSecondary }]}>
+          {isPending
+            ? 'Your gym has not approved your membership yet. You can check in as soon as they do.'
+            : 'Your membership has expired, so check-in is disabled. Renew to start scanning again.'}
+        </Text>
+        {isPending ? (
+          <Button
+            title="Return to Home"
+            onPress={() => router.replace('/(member)/home')}
+            variant="primary"
+            size="lg"
+            style={styles.returnButton}
+          />
+        ) : (
+          <Button
+            title="Renew Membership"
+            onPress={() => router.push('/(member)/renew')}
+            variant="primary"
+            size="lg"
+            icon={<Ionicons name="refresh-outline" size={20} color="#000000" />}
+            style={styles.returnButton}
+          />
+        )}
+      </View>
+    );
+  }
 
   // Already Checked In View
   if (hasCheckedInToday && !successData) {

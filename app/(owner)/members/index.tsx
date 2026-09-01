@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -9,14 +9,16 @@ import {
   RefreshControl,
   ScrollView,
 } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import { useAppAuth } from '../../../lib/auth';
 import { useTheme } from '../../../lib/theme';
 import MemberListItem from '../../../components/MemberListItem';
 import { useMembers } from '../../../hooks/useMembers';
+import { daysRemaining, formatDate } from '../../../utils/date';
 import Input from '../../../components/ui/Input';
 
-type FilterTab = 'all' | 'active' | 'pending' | 'expired';
+type FilterTab = 'all' | 'active' | 'expiring' | 'unpaid' | 'pending' | 'expired' | 'removed';
 
 interface TabItem {
   key: FilterTab;
@@ -26,16 +28,45 @@ interface TabItem {
 const TABS: TabItem[] = [
   { key: 'all', label: 'All' },
   { key: 'active', label: 'Active' },
+  // Derived, not a gym_members.status: active members whose subscription ends
+  // within 7 days. This is the "who do I need to chase" list.
+  { key: 'expiring', label: 'Expiring' },
+  // Active members with no subscription at all — approved without payment.
+  // Without this they look identical to paying members in the Active tab.
+  { key: 'unpaid', label: 'No Plan' },
   { key: 'pending', label: 'Pending' },
   { key: 'expired', label: 'Expired' },
+  // Former members. Excluded from every other tab (see useMembers), so this is
+  // the only place they can be found and restored.
+  { key: 'removed', label: 'Removed' },
 ];
 
 export default function OwnerMembersListScreen() {
   const router = useRouter();
+  const { gymId, supabase } = useAppAuth();
   const { colors, isDark } = useTheme();
 
-  const [activeTab, setActiveTab] = useState<FilterTab>('all');
+  // Honour ?status= from the dashboard cards.
+  //
+  // This tab screen stays mounted, so its filter previously persisted from the
+  // last visit and a card tap landed you on whatever was already selected —
+  // which read as the filter being "stuck". Keying off the param makes the
+  // entry point deterministic while manual changes still stick within a visit.
+  const params = useLocalSearchParams<{ status?: string }>();
+  const initialTab: FilterTab = TABS.some((t: TabItem) => t.key === params.status)
+    ? (params.status as FilterTab)
+    : 'all';
+
+  const [activeTab, setActiveTab] = useState<FilterTab>(initialTab);
   const [searchQuery, setSearchQuery] = useState('');
+
+  // A card tap re-navigates to the same mounted screen, so re-apply the param
+  // when it changes rather than relying on initial state.
+  useEffect(() => {
+    if (params.status && TABS.some((t: TabItem) => t.key === params.status)) {
+      setActiveTab(params.status as FilterTab);
+    }
+  }, [params.status]);
 
   // Fetch all members for counting pending badges, or use specific filter
   const {
@@ -46,6 +77,43 @@ export default function OwnerMembersListScreen() {
     status: activeTab === 'all' ? undefined : activeTab,
     search: searchQuery,
   });
+
+  // One query for the whole gym rather than a join on every row: the owner
+  // needs to spot a renewal while scrolling, and the set is tiny.
+  const [renewalMemberIds, setRenewalMemberIds] = useState<Set<string>>(new Set());
+
+  const fetchRenewalFlags = useCallback(async () => {
+    if (!gymId) return;
+    try {
+      const { data, error } = await supabase
+        .from('renewal_requests')
+        .select('gym_member_id')
+        .eq('gym_id', gymId)
+        .eq('status', 'pending');
+
+      if (error) {
+        console.warn('[Members] Renewal flags:', error.message);
+        return;
+      }
+      setRenewalMemberIds(
+        new Set((data ?? []).map((r: { gym_member_id: string }) => r.gym_member_id))
+      );
+    } catch (err) {
+      console.warn('[Members] Renewal flags error:', err);
+    }
+  }, [gymId, supabase]);
+
+  useEffect(() => {
+    fetchRenewalFlags();
+  }, [fetchRenewalFlags]);
+
+  // This tab screen stays mounted, so without this the RENEWAL chips would
+  // still be showing after the owner took the payment.
+  useFocusEffect(
+    useCallback(() => {
+      fetchRenewalFlags();
+    }, [fetchRenewalFlags])
+  );
 
   // Query pending members count separately to show on header/badge
   const { members: allMembersForBadges } = useMembers({ status: 'all' });
@@ -223,7 +291,23 @@ export default function OwnerMembersListScreen() {
               photoUrl={item.profile?.photo_url}
               status={item.status}
               role={item.role}
-              subtitle={item.profile?.phone || item.profile?.email || undefined}
+              subtitle={
+                // In the Expiring view the useful fact is WHEN, not the phone
+                // number — a list of names you must tap through isn't actionable.
+                activeTab === 'expiring' && item.active_end_date
+                  ? `Expires in ${daysRemaining(item.active_end_date)} day(s) · ${formatDate(item.active_end_date)}`
+                  : activeTab === 'unpaid'
+                    ? 'No plan recorded — never paid'
+                    : // Flag unpaid members in EVERY list, not just the No Plan
+                      // tab. A filter only helps an owner who thinks to look;
+                      // this surfaces it while they're scrolling normally.
+                      item.status === 'active' &&
+                        item.role === 'member' &&
+                        !item.active_end_date
+                      ? 'No plan recorded'
+                      : item.profile?.phone || item.profile?.email || undefined
+              }
+              hasRenewalRequest={renewalMemberIds.has(item.id)}
               onPress={() => router.push(`/(owner)/members/${item.id}`)}
             />
           )}
@@ -233,7 +317,10 @@ export default function OwnerMembersListScreen() {
           refreshControl={
             <RefreshControl
               refreshing={loading}
-              onRefresh={refresh}
+              onRefresh={() => {
+                refresh();
+                fetchRenewalFlags();
+              }}
               tintColor={colors.primary}
               colors={[colors.primary]}
             />

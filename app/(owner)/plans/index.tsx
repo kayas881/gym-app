@@ -17,6 +17,7 @@ import { useTheme } from '../../../lib/theme';
 import Card from '../../../components/ui/Card';
 import Badge from '../../../components/ui/Badge';
 import Button from '../../../components/ui/Button';
+import { planNameStatesDuration } from '../../../utils/plan-label';
 
 interface MembershipPlan {
   id: string;
@@ -237,16 +238,27 @@ export default function PlansListScreen() {
                       {item.name}
                     </Text>
                     <View style={styles.badgeRow}>
-                      <Badge
-                        text={item.is_active ? 'ACTIVE' : 'INACTIVE'}
-                        variant={item.is_active ? 'success' : 'default'}
-                        size="sm"
-                      />
-                      <Badge
-                        text={`${item.duration_months} ${item.duration_months === 1 ? 'Month' : 'Months'}`}
-                        variant="info"
-                        size="sm"
-                      />
+                      {/*
+                        Only show INACTIVE. The switch beside this row already
+                        shows the active state, so an "ACTIVE" badge next to an
+                        on switch said the same thing twice — whereas INACTIVE
+                        is worth calling out because such a plan can't be sold.
+                      */}
+                      {!item.is_active ? (
+                        <Badge text="INACTIVE" variant="default" size="sm" />
+                      ) : null}
+                      {/*
+                        The price line below already reads "/ 3 months", and
+                        most plan names state the term too ("3 Months"), so this
+                        badge only earns its place when the name doesn't.
+                      */}
+                      {!planNameStatesDuration(item.name, item.duration_months) ? (
+                        <Badge
+                          text={`${item.duration_months} ${item.duration_months === 1 ? 'Month' : 'Months'}`}
+                          variant="info"
+                          size="sm"
+                        />
+                      ) : null}
                     </View>
                   </View>
 

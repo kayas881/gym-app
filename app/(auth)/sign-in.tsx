@@ -463,6 +463,20 @@ export default function SignInScreen() {
             </View>
           </View>
 
+          {/* Without this there was no way back into an account at all: a member
+              who forgot their password and had not used Google was locked out
+              for good. */}
+          <TouchableOpacity
+            onPress={() => router.push('/(auth)/forgot-password')}
+            style={styles.forgotRow}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            disabled={loading || googleLoading}
+          >
+            <Text style={[styles.forgotText, { color: colors.primary }]}>
+              Forgot password?
+            </Text>
+          </TouchableOpacity>
+
           {/* Sign In Button */}
           <TouchableOpacity
             style={[
@@ -671,6 +685,15 @@ const styles = StyleSheet.create({
   eyeButton: {
     padding: 4,
     marginLeft: 6,
+  },
+  forgotRow: {
+    alignSelf: 'flex-end',
+    marginTop: -6,
+    marginBottom: 14,
+  },
+  forgotText: {
+    fontSize: 13,
+    fontWeight: '700',
   },
   signInButton: {
     height: 48,

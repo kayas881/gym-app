@@ -13,7 +13,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAppAuth } from '../../lib/auth';
 import { useTheme } from '../../lib/theme';
 import { useCheckIns } from '../../hooks/useCheckIns';
-import { formatDate, formatDateTime, timeAgo } from '../../utils/date';
+import { formatDate, formatDateTime, timeAgo, today } from '../../utils/date';
 import Card from '../../components/ui/Card';
 import Badge from '../../components/ui/Badge';
 
@@ -94,7 +94,9 @@ export default function AttendanceScreen() {
       });
     }
 
-    const todayStr = new Date().toISOString().split('T')[0];
+    // today(), not toISOString().split('T')[0]: the latter is the UTC day, so
+    // between 00:00 and 05:29 IST the calendar highlighted yesterday as today.
+    const todayStr = today();
 
     // Actual month days
     for (let day = 1; day <= daysInMonth; day++) {

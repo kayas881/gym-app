@@ -139,6 +139,13 @@ export function useAnnouncements() {
       // Fire the push notification. Deliberately not awaited into the caller's
       // error path: the announcement is already saved and visible in-app, so a
       // notification failure must not make posting look like it failed.
+      //
+      // This is the ONLY announcement push path. A database trigger doing the
+      // same thing was added and then reverted (migrations 031 and 035) because
+      // running both delivered every announcement twice. The Edge Function wins
+      // because it reads Expo's tickets to prune dead tokens and batches at
+      // Expo's 100-message limit, neither of which a pg_net trigger can do.
+      // Its source lives at supabase/functions/notify-announcement/index.ts.
       if (created?.id) {
         supabase.functions
           .invoke('notify-announcement', {

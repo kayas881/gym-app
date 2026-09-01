@@ -13,6 +13,7 @@ import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { dateOfBirthError, parseIndianDate, toIndianDate } from '../../utils/date';
 import { useAppAuth } from '../../lib/auth';
 import { useTheme } from '../../lib/theme';
 import { uploadImageAsset, isLocalFileUri } from '../../lib/storage';
@@ -38,8 +39,12 @@ export default function StaffProfileScreen() {
 
   const [fullName, setFullName] = useState(profile?.full_name || '');
   const [phone, setPhone] = useState(profile?.phone || '');
-  const [dateOfBirth, setDateOfBirth] = useState(profile?.date_of_birth || '');
+  // Held in the day-first form the user sees; converted to ISO on save.
+  const [dateOfBirth, setDateOfBirth] = useState(toIndianDate(profile?.date_of_birth));
   const [gender, setGender] = useState(profile?.gender || '');
+  // Collected during complete-profile signup but absent from this form, so a
+  // staff member could never see or correct their own stored address.
+  const [address, setAddress] = useState(profile?.address || '');
   const [emergencyName, setEmergencyName] = useState(
     profile?.emergency_contact_name || ''
   );
@@ -58,8 +63,9 @@ export default function StaffProfileScreen() {
     if (profile) {
       setFullName(profile.full_name || '');
       setPhone(profile.phone || '');
-      setDateOfBirth(profile.date_of_birth || '');
+      setDateOfBirth(toIndianDate(profile.date_of_birth));
       setGender(profile.gender || '');
+      setAddress(profile.address || '');
       setEmergencyName(profile.emergency_contact_name || '');
       setEmergencyPhone(profile.emergency_contact_phone || '');
       setPhotoUrl(
@@ -105,6 +111,14 @@ export default function StaffProfileScreen() {
       return;
     }
 
+    // Free-text field writing to a Postgres `date`. Unchecked, a day-first or
+    // overflow date failed in the driver and surfaced as a raw 22007/22008.
+    const dobError = dateOfBirthError(dateOfBirth);
+    if (dobError) {
+      Alert.alert('Check your date of birth', dobError);
+      return;
+    }
+
     setIsSaving(true);
     try {
       let photoUrlToSave = photoUrl;
@@ -137,8 +151,9 @@ export default function StaffProfileScreen() {
         .update({
           full_name: fullName.trim(),
           phone: phone.trim() || null,
-          date_of_birth: dateOfBirth.trim() || null,
+          date_of_birth: parseIndianDate(dateOfBirth),
           gender: gender || null,
+          address: address.trim() || null,
           emergency_contact_name: emergencyName.trim() || null,
           emergency_contact_phone: emergencyPhone.trim() || null,
           photo_url: photoUrlToSave || null,
@@ -228,8 +243,8 @@ export default function StaffProfileScreen() {
             keyboardType="phone-pad"
           />
           <Input
-            label="Date of Birth"
-            placeholder="YYYY-MM-DD"
+            label="Date of Birth (DD/MM/YYYY)"
+            placeholder="15/08/1995"
             value={dateOfBirth}
             onChangeText={setDateOfBirth}
             autoCapitalize="none"
@@ -266,6 +281,14 @@ export default function StaffProfileScreen() {
               );
             })}
           </View>
+
+          <Input
+            label="Address"
+            placeholder="Street, area, city"
+            value={address}
+            onChangeText={setAddress}
+            autoCapitalize="words"
+          />
         </Card>
 
         <Text style={[styles.sectionTitle, { color: colors.text }]}>

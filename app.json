@@ -42,7 +42,7 @@
       [
         "expo-camera",
         {
-          "cameraPermission": "Allow Gym App to access your camera for QR code check-in."
+          "cameraPermission": "Allow Gym App to access your camera to scan your gym’s join and check-in codes, and to photograph issues you report."
         }
       ],
       [

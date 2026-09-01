@@ -37,7 +37,41 @@ export default function CreateComplaintScreen() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errors, setErrors] = useState<{ subject?: string; body?: string }>({});
 
-  const handlePickPhoto = async () => {
+  // Shared by both sources. base64 is needed to upload without
+  // expo-file-system (see lib/storage.ts).
+  const pickerOptions: ImagePicker.ImagePickerOptions = {
+    mediaTypes: ['images'],
+    allowsEditing: true,
+    quality: 0.7,
+    base64: true,
+  };
+
+  const applyResult = (result: ImagePicker.ImagePickerResult) => {
+    if (!result.canceled && result.assets && result.assets[0]?.uri) {
+      // Preview the local file; it is uploaded on submit.
+      setSelectedPhoto(result.assets[0].uri);
+      setPendingPhotoAsset(result.assets[0]);
+    }
+  };
+
+  const handleTakePhoto = async () => {
+    try {
+      const { status } = await ImagePicker.requestCameraPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert(
+          'Camera Permission Needed',
+          'We need access to your camera to photograph the issue.'
+        );
+        return;
+      }
+      applyResult(await ImagePicker.launchCameraAsync(pickerOptions));
+    } catch (err) {
+      console.error('[CreateComplaint] Error taking photo:', err);
+      Alert.alert('Error', 'Failed to open the camera.');
+    }
+  };
+
+  const handleChooseFromLibrary = async () => {
     try {
       const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
       if (status !== 'granted') {
@@ -47,24 +81,22 @@ export default function CreateComplaintScreen() {
         );
         return;
       }
-
-      const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
-        allowsEditing: true,
-        quality: 0.7,
-        // Needed to upload without expo-file-system (see lib/storage.ts).
-        base64: true,
-      });
-
-      if (!result.canceled && result.assets && result.assets[0]?.uri) {
-        // Preview the local file; it is uploaded on submit.
-        setSelectedPhoto(result.assets[0].uri);
-        setPendingPhotoAsset(result.assets[0]);
-      }
+      applyResult(await ImagePicker.launchImageLibraryAsync(pickerOptions));
     } catch (err) {
       console.error('[CreateComplaint] Error picking image:', err);
       Alert.alert('Error', 'Failed to pick image.');
     }
+  };
+
+  // The button has always offered to "take" a photo, but only the library was
+  // ever opened. Reporting broken equipment happens in front of the equipment,
+  // so the camera is the more useful of the two.
+  const handlePickPhoto = () => {
+    Alert.alert('Attach Photo', 'Choose where to get the photo from.', [
+      { text: 'Take Photo', onPress: handleTakePhoto },
+      { text: 'Choose from Library', onPress: handleChooseFromLibrary },
+      { text: 'Cancel', style: 'cancel' },
+    ]);
   };
 
   const handleRemovePhoto = () => {

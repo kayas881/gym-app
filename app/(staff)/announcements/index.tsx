@@ -15,7 +15,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAppAuth } from '../../../lib/auth';
 import { useTheme } from '../../../lib/theme';
 import { useAnnouncements } from '../../../hooks/useAnnouncements';
-import { timeAgo, formatDateTime } from '../../../utils/date';
+import { timestampLabel } from '../../../utils/date';
 import Avatar from '../../../components/ui/Avatar';
 import Badge from '../../../components/ui/Badge';
 import Card from '../../../components/ui/Card';
@@ -87,7 +87,7 @@ export default function StaffAnnouncementsScreen() {
                 {item.author?.full_name || 'Staff Member'}
               </Text>
               <Text style={[styles.timeText, { color: colors.textTertiary }]}>
-                {timeAgo(item.created_at)} • {formatDateTime(item.created_at)}
+                {timestampLabel(item.created_at)}
               </Text>
             </View>
           </View>
