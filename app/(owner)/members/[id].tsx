@@ -21,6 +21,7 @@ import Badge from '../../../components/ui/Badge';
 import Button from '../../../components/ui/Button';
 import Input from '../../../components/ui/Input';
 import StatusBadge from '../../../components/ui/StatusBadge';
+import ClaimCodePanel from '../../../components/ClaimCodePanel';
 import { useToday } from '../../../hooks/useToday';
 import {
   daysRemaining,
@@ -55,6 +56,8 @@ interface MemberDetail {
     address: string | null;
     health_notes: string | null;
     fitness_goal: string | null;
+    /** NULL means the owner created this member and they have no app login yet. */
+    clerk_id: string | null;
   };
 }
 
@@ -205,6 +208,7 @@ export default function MemberDetailScreen() {
           joined_at,
           profile:profiles (
             id,
+            clerk_id,
             full_name,
             email,
             phone,
@@ -922,6 +926,14 @@ export default function MemberDetailScreen() {
             </View>
           )}
         </Card>
+
+        {/* Only rendered for a member with no app login; the panel hides itself
+            otherwise. */}
+        <ClaimCodePanel
+          gymMemberId={member.id}
+          memberName={member.profile?.full_name || 'This member'}
+          hasAppLogin={!!member.profile?.clerk_id}
+        />
 
         {/* Contact & Personal Details */}
         <View style={styles.sectionHeader}>

@@ -213,8 +213,67 @@ function SelectField({
 
 export default function CompleteProfileScreen() {
   const router = useRouter();
-  const { colors } = useTheme();
-  const { profile, userId, supabase, refreshProfile, signOut } = useAppAuth();
+  const { colors, isDark } = useTheme();
+  const { profile, userId, supabase, refreshProfile, refreshMembership, signOut } =
+    useAppAuth();
+
+  // Claiming an existing membership. Offered HERE, before any of the fields
+  // below are filled in, because a successful claim adopts the record the gym
+  // owner already created — name, phone, plan, payments and all — so typing any
+  // of it first would be wasted work.
+  const [claimVisible, setClaimVisible] = useState(false);
+  const [claimCode, setClaimCode] = useState('');
+  const [claiming, setClaiming] = useState(false);
+  const [claimError, setClaimError] = useState('');
+
+  const handleClaim = async () => {
+    const entered = claimCode.trim();
+    if (entered.length < 6) {
+      setClaimError('Enter the 6-character code from your gym.');
+      return;
+    }
+    setClaiming(true);
+    setClaimError('');
+    try {
+      const { data, error } = await supabase.rpc('claim_member_record', {
+        p_code: entered,
+      });
+      if (error) throw error;
+
+      // The function reports failure in its result rather than raising, so that
+      // it can record the attempt for rate limiting (a raise would roll that
+      // insert back). Read `ok`, show `message`.
+      const result = data as { ok?: boolean; message?: string } | null;
+      if (!result?.ok) {
+        setClaimError(result?.message || 'That code could not be used.');
+        return;
+      }
+
+      setClaimVisible(false);
+      // The signed-in user now points at the gym's record, so re-read both.
+      await refreshProfile();
+      await refreshMembership();
+      Alert.alert(
+        'Membership linked',
+        'Your plan, payments and history are all here.',
+        [
+          {
+            text: 'OK',
+            // Back to the router entry point rather than guessing a destination:
+            // index.tsx already knows whether a profile still needs finishing and
+            // which role's home this account belongs on. Staying on this form
+            // after a successful claim would be the wrong screen entirely.
+            onPress: () => router.replace('/'),
+          },
+        ]
+      );
+    } catch (err: any) {
+      console.error('[CompleteProfile] Claim error:', err);
+      setClaimError(err?.message || 'Something went wrong. Please try again.');
+    } finally {
+      setClaiming(false);
+    }
+  };
 
   // Form State
   const [fullName, setFullName] = useState(profile?.full_name || '');
@@ -447,6 +506,32 @@ export default function CompleteProfileScreen() {
               Fill in your details to get the best gym experience tailored to your goals.
             </Text>
           </View>
+
+          {/* Most members are registered at the desk long before they install
+              anything. If the owner has given them a code, this is the shortest
+              path to their real record. */}
+          <TouchableOpacity
+            style={[
+              styles.claimBanner,
+              {
+                borderColor: colors.primary,
+                backgroundColor: isDark ? 'rgba(0, 230, 118, 0.08)' : '#F0FAF5',
+              },
+            ]}
+            onPress={() => setClaimVisible(true)}
+            activeOpacity={0.8}
+          >
+            <Ionicons name="key-outline" size={20} color={colors.primary} />
+            <View style={styles.claimBannerText}>
+              <Text style={[styles.claimBannerTitle, { color: colors.text }]}>
+                Already a member at your gym?
+              </Text>
+              <Text style={[styles.claimBannerSub, { color: colors.textSecondary }]}>
+                Enter the code they gave you and skip filling this in
+              </Text>
+            </View>
+            <Ionicons name="chevron-forward" size={18} color={colors.primary} />
+          </TouchableOpacity>
 
           {/* Profile Photo Avatar */}
           <View style={styles.avatarSection}>
@@ -744,11 +829,99 @@ export default function CompleteProfileScreen() {
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
+
+      <Modal
+        visible={claimVisible}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setClaimVisible(false)}
+      >
+        <View style={[styles.claimOverlay, { backgroundColor: colors.overlay }]}>
+          <View
+            style={[
+              styles.claimSheet,
+              { backgroundColor: colors.surface, borderColor: colors.border },
+            ]}
+          >
+            <View style={styles.claimSheetHeader}>
+              <Text style={[styles.claimSheetTitle, { color: colors.text }]}>
+                Enter your gym code
+              </Text>
+              <TouchableOpacity
+                onPress={() => setClaimVisible(false)}
+                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              >
+                <Ionicons name="close" size={24} color={colors.textSecondary} />
+              </TouchableOpacity>
+            </View>
+
+            <Text style={[styles.claimSheetSub, { color: colors.textSecondary }]}>
+              Your gym gives you a 6-character code. It links this app to the
+              membership they already set up for you.
+            </Text>
+
+            <Input
+              label="Claim Code"
+              placeholder="e.g. HD3XF6"
+              value={claimCode}
+              onChangeText={(t) => {
+                setClaimCode(t.toUpperCase());
+                if (claimError) setClaimError('');
+              }}
+              error={claimError}
+              autoCapitalize="characters"
+              autoCorrect={false}
+              maxLength={12}
+            />
+
+            <Button
+              title="Link my membership"
+              onPress={handleClaim}
+              variant="primary"
+              size="lg"
+              fullWidth
+              loading={claiming}
+            />
+
+            <Text style={[styles.claimSheetFoot, { color: colors.textTertiary }]}>
+              No code? Just fill in your details below instead.
+            </Text>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
+  claimBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    borderWidth: 1,
+    borderRadius: 14,
+    padding: 14,
+    marginBottom: 20,
+  },
+  claimBannerText: { flex: 1 },
+  claimBannerTitle: { fontSize: 14, fontWeight: '700' },
+  claimBannerSub: { fontSize: 12, marginTop: 1 },
+  claimOverlay: { flex: 1, justifyContent: 'flex-end' },
+  claimSheet: {
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    borderWidth: 1,
+    padding: 20,
+    paddingBottom: 32,
+  },
+  claimSheetHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  claimSheetTitle: { fontSize: 18, fontWeight: '700' },
+  claimSheetSub: { fontSize: 13, lineHeight: 18, marginTop: 6, marginBottom: 16 },
+  claimSheetFoot: { fontSize: 12, textAlign: 'center', marginTop: 14 },
   safeArea: {
     flex: 1,
   },
