@@ -15,6 +15,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useAppAuth } from '../../lib/auth';
 import { useTheme } from '../../lib/theme';
 import StatCard from '../../components/StatCard';
+import DuesBanner from '../../components/DuesBanner';
 import PeakHoursChart from '../../components/PeakHoursChart';
 import Avatar from '../../components/ui/Avatar';
 import Badge from '../../components/ui/Badge';
@@ -364,6 +365,12 @@ export default function OwnerDashboardScreen() {
                 <Ionicons name="chevron-forward" size={20} color={colors.primary} />
               </TouchableOpacity>
             ) : null}
+
+            {/* The Revenue card above reports money COLLECTED. Nothing else on
+                this screen can say money is still owed, so a part payment was
+                recorded and then effectively disappeared -- the owner saw
+                "Revenue 2,300" and had no way to reach the 200 outstanding. */}
+            <DuesBanner />
 
             {/* Stat Cards Grid */}
             <View style={styles.statsSection}>
