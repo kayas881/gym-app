@@ -136,7 +136,9 @@ export default function OwnerLayout() {
       <Tabs.Screen name="invite" options={{ href: null }} />
       <Tabs.Screen name="members/[id]" options={{ href: null }} />
       <Tabs.Screen name="members/pending" options={{ href: null }} />
+      <Tabs.Screen name="members/add" options={{ href: null }} />
       <Tabs.Screen name="payments/record" options={{ href: null }} />
+      <Tabs.Screen name="payments/dues" options={{ href: null }} />
       <Tabs.Screen name="plans/index" options={{ href: null }} />
       <Tabs.Screen name="plans/create" options={{ href: null }} />
       <Tabs.Screen name="announcements/index" options={{ href: null }} />

@@ -173,6 +173,17 @@ export default function OwnerMembersListScreen() {
           </Text>
         </View>
 
+        {/* Most members never download the app. Without a way to add them by
+            hand they did not exist in the system at all, so the owner ran the
+            app and a notebook side by side. */}
+        <TouchableOpacity
+          style={[styles.addMemberButton, { backgroundColor: colors.primary }]}
+          onPress={() => router.push('/(owner)/members/add')}
+          activeOpacity={0.8}
+        >
+          <Ionicons name="person-add" size={18} color="#000000" />
+        </TouchableOpacity>
+
         <TouchableOpacity
           style={[
             styles.pendingBadgeButton,
@@ -376,6 +387,14 @@ const styles = StyleSheet.create({
   headerSubtitle: {
     fontSize: 13,
     marginTop: 2,
+  },
+  addMemberButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 8,
   },
   pendingBadgeButton: {
     height: 40,
