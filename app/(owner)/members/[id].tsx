@@ -75,6 +75,12 @@ export default function MemberDetailScreen() {
   const { supabase, gymId, isSignedIn } = useAppAuth();
   const { colors, isDark } = useTheme();
 
+  // Must stay above the early returns below: it is a hook, and sitting after
+  // the "if (loading)" return changed the hook count between renders.
+  // Re-renders when the local day changes or the screen regains focus, so the
+  // day count further down cannot sit frozen on a screen left open overnight.
+  useToday();
+
   const [member, setMember] = useState<MemberDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -634,21 +640,12 @@ export default function MemberDetailScreen() {
     );
   }
 
-  // Re-renders when the local day changes or the screen regains focus, so the
-  // day count below cannot sit frozen on a screen left open.
-  useToday();
-
-  // Count down to coverageEndDate, NOT activeSubscription.end_date. A member who
-  // renews early holds two active subscriptions, and access ends at the later
-  // one -- reading the current row showed Aman "90 Days Left" when he was paid
-  // through to 01/03/2027, which would have had the owner chasing him for a
-  // renewal he had already bought.
-  // Only the plan being displayed on this card. Other subscriptions with their
-  // own balances are listed on the Dues screen.
   // Drives every "we cannot know this" state on this screen: no login means no
   // way to scan the check-in QR.
   const hasAppLogin = !!member?.profile?.clerk_id;
 
+  // Only the plan being displayed on this card. Other subscriptions with their
+  // own balances are listed on the Dues screen.
   const balanceDue = activeSubscription
     ? Math.max(
         Number(activeSubscription.plan_price ?? 0) -
@@ -657,6 +654,11 @@ export default function MemberDetailScreen() {
       )
     : 0;
 
+  // Count down to coverageEndDate, NOT activeSubscription.end_date. A member who
+  // renews early holds two active subscriptions, and access ends at the later
+  // one -- reading the current row showed Aman "90 Days Left" when he was paid
+  // through to 01/03/2027, which would have had the owner chasing him for a
+  // renewal he had already bought.
   const daysLeft = coverageEndDate ? daysRemaining(coverageEndDate) : 0;
   const isExp = coverageEndDate ? daysLeft === 0 : true;
 
