@@ -34,6 +34,7 @@ import {
   toIndianDate,
 } from '../../../utils/date';
 import { generateReceiptHTML } from '../../../utils/receipt-template';
+import { KEYBOARD_AVOID_BEHAVIOR } from '../../../constants/keyboard';
 
 interface MembershipPlan {
   id: string;
@@ -480,6 +481,41 @@ To add time instead, use ${formatDate(
         leftIcon={<Text style={[styles.currencyPrefix, { color: colors.primary }]}>₹</Text>}
       />
 
+      {/* Members routinely pay part of a plan and promise the rest. The
+          shortfall is recorded as a balance rather than being lost, but the
+          owner has to SEE it happening at the moment they take the money --
+          otherwise a mistyped amount silently becomes a debt. */}
+      {selectedPlan && amountPaid.trim() !== '' && !isNaN(parseFloat(amountPaid)) ? (
+        balanceAfterPayment > 0 ? (
+          <View
+            style={[
+              styles.balanceNotice,
+              { borderColor: colors.warning, backgroundColor: colors.surfaceElevated },
+            ]}
+          >
+            <Ionicons name="alert-circle-outline" size={18} color={colors.warning} />
+            <Text style={[styles.balanceNoticeText, { color: colors.warning }]}>
+              Part payment. ₹{balanceAfterPayment.toLocaleString('en-IN')} of the{' '}
+              ₹{selectedPlan.price.toLocaleString('en-IN')} plan will stay outstanding, and{' '}
+              {selectedMember?.profile?.full_name || 'this member'} will show up under Dues
+              until it is collected.
+            </Text>
+          </View>
+        ) : (
+          <View
+            style={[
+              styles.balanceNotice,
+              { borderColor: colors.primary, backgroundColor: colors.surfaceElevated },
+            ]}
+          >
+            <Ionicons name="checkmark-circle-outline" size={18} color={colors.primary} />
+            <Text style={[styles.balanceNoticeText, { color: colors.textSecondary }]}>
+              Paid in full — nothing outstanding.
+            </Text>
+          </View>
+        )
+      ) : null}
+
       {/* Payment Method Selector */}
       <Text style={[styles.fieldLabel, { color: colors.textSecondary }]}>
         Payment Method
@@ -758,13 +794,28 @@ To add time instead, use ${formatDate(
     );
   };
 
+  // What will still be owed once this payment is recorded. The database
+  // refuses anything above the plan price, so the UI must not offer it either.
+  const balanceAfterPayment = useMemo(() => {
+    if (!selectedPlan) return 0;
+    const paid = parseFloat(amountPaid);
+    if (isNaN(paid)) return selectedPlan.price;
+    return Math.max(selectedPlan.price - paid, 0);
+  }, [selectedPlan, amountPaid]);
+
+  const overPaying = useMemo(() => {
+    if (!selectedPlan) return false;
+    const paid = parseFloat(amountPaid);
+    return !isNaN(paid) && paid > selectedPlan.price;
+  }, [selectedPlan, amountPaid]);
+
   // Determine if Next is enabled for current step
   const isNextDisabled = () => {
     if (currentStep === 1) return !selectedMember;
     if (currentStep === 2) return !selectedPlan;
     if (currentStep === 3) {
       const val = parseFloat(amountPaid);
-      return isNaN(val) || val < 0 || !startDate;
+      return isNaN(val) || val < 0 || overPaying || !startDate;
     }
     return false;
   };
@@ -772,7 +823,7 @@ To add time instead, use ${formatDate(
   return (
     <KeyboardAvoidingView
       style={[styles.screen, { backgroundColor: colors.background }]}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      behavior={KEYBOARD_AVOID_BEHAVIOR}
     >
       {/* Header */}
       <View style={styles.header}>
@@ -1061,6 +1112,21 @@ const styles = StyleSheet.create({
   planDesc: {
     fontSize: 12,
     lineHeight: 16,
+  },
+  balanceNotice: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 8,
+    borderWidth: 1,
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 16,
+    marginTop: -4,
+  },
+  balanceNoticeText: {
+    flex: 1,
+    fontSize: 13,
+    lineHeight: 18,
   },
   currencyPrefix: {
     fontSize: 18,

@@ -16,6 +16,7 @@ import { Ionicons } from '@expo/vector-icons';
 import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
 import { useAppAuth } from '../../../lib/auth';
+import { useDues } from '../../../hooks/useDues';
 import { useTheme } from '../../../lib/theme';
 import Card from '../../../components/ui/Card';
 import Badge from '../../../components/ui/Badge';
@@ -59,6 +60,7 @@ interface PaymentRecord {
 export default function OwnerPaymentsScreen() {
   const router = useRouter();
   const { gymId, currentMembership, supabase } = useAppAuth();
+  const { totalOutstanding, membersOwing } = useDues();
   const { colors, isDark } = useTheme();
 
   const [payments, setPayments] = useState<PaymentRecord[]>([]);
@@ -326,6 +328,34 @@ export default function OwnerPaymentsScreen() {
           <Text style={styles.recordBtnText}>Record</Text>
         </TouchableOpacity>
       </View>
+
+      {/* Part payments are invisible on this screen -- it lists what WAS
+          collected, not what is still owed -- so the dues total needs its own
+          way in. Hidden entirely when nobody owes anything. */}
+      {totalOutstanding > 0 ? (
+        <TouchableOpacity
+          style={[
+            styles.duesBanner,
+            {
+              backgroundColor: isDark ? 'rgba(255, 171, 0, 0.10)' : '#FFF8E1',
+              borderColor: colors.warning,
+            },
+          ]}
+          onPress={() => router.push('/(owner)/payments/dues')}
+          activeOpacity={0.8}
+        >
+          <Ionicons name="alert-circle" size={22} color={colors.warning} />
+          <View style={styles.duesTextGroup}>
+            <Text style={[styles.duesAmount, { color: colors.warning }]}>
+              ₹{totalOutstanding.toLocaleString('en-IN')} outstanding
+            </Text>
+            <Text style={[styles.duesSub, { color: colors.textSecondary }]}>
+              {membersOwing} {membersOwing === 1 ? 'member has' : 'members have'} a balance to pay
+            </Text>
+          </View>
+          <Ionicons name="chevron-forward" size={18} color={colors.warning} />
+        </TouchableOpacity>
+      ) : null}
 
       {/* Summary Card */}
       <View style={styles.summaryCardWrapper}>
@@ -623,6 +653,19 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '700',
   },
+  duesBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    borderWidth: 1,
+    borderRadius: 14,
+    padding: 14,
+    marginHorizontal: 16,
+    marginBottom: 12,
+  },
+  duesTextGroup: { flex: 1 },
+  duesAmount: { fontSize: 16, fontWeight: '800' },
+  duesSub: { fontSize: 12, marginTop: 1 },
   summaryCardWrapper: {
     paddingHorizontal: 16,
     marginBottom: 12,

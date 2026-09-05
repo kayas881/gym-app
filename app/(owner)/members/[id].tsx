@@ -639,6 +639,16 @@ export default function MemberDetailScreen() {
   // one -- reading the current row showed Aman "90 Days Left" when he was paid
   // through to 01/03/2027, which would have had the owner chasing him for a
   // renewal he had already bought.
+  // Only the plan being displayed on this card. Other subscriptions with their
+  // own balances are listed on the Dues screen.
+  const balanceDue = activeSubscription
+    ? Math.max(
+        Number(activeSubscription.plan_price ?? 0) -
+          Number(activeSubscription.amount_paid ?? 0),
+        0
+      )
+    : 0;
+
   const daysLeft = coverageEndDate ? daysRemaining(coverageEndDate) : 0;
   const isExp = coverageEndDate ? daysLeft === 0 : true;
 
@@ -851,6 +861,30 @@ export default function MemberDetailScreen() {
                   </Text>
                 </View>
               </View>
+
+              {/* A part paid plan is otherwise invisible here: the card shows
+                  dates and the payment history shows what WAS paid, neither of
+                  which says money is still owed. */}
+              {balanceDue > 0 ? (
+                <TouchableOpacity
+                  style={[
+                    styles.balanceRow,
+                    {
+                      borderColor: colors.warning,
+                      backgroundColor: isDark ? 'rgba(255, 171, 0, 0.10)' : '#FFF8E1',
+                    },
+                  ]}
+                  onPress={() => router.push('/(owner)/payments/dues')}
+                  activeOpacity={0.8}
+                >
+                  <Ionicons name="alert-circle" size={18} color={colors.warning} />
+                  <Text style={[styles.balanceText, { color: colors.warning }]}>
+                    ₹{balanceDue.toLocaleString('en-IN')} still due on this plan
+                  </Text>
+                  <Text style={[styles.balanceCta, { color: colors.warning }]}>Collect</Text>
+                  <Ionicons name="chevron-forward" size={16} color={colors.warning} />
+                </TouchableOpacity>
+              ) : null}
 
               {/* Without this the dates above and the "N Days Left" badge look
                   like they contradict each other: the grid shows the plan running
@@ -1682,6 +1716,18 @@ const styles = StyleSheet.create({
     marginBottom: 14,
   },
   requestedBannerText: { flex: 1, fontSize: 12, lineHeight: 17 },
+  balanceRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    borderWidth: 1,
+    borderRadius: 12,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    marginTop: 12,
+  },
+  balanceText: { flex: 1, fontSize: 13, fontWeight: '700' },
+  balanceCta: { fontSize: 13, fontWeight: '700' },
   renewedRow: {
     flexDirection: 'row',
     alignItems: 'flex-start',

@@ -8,6 +8,13 @@ interface Subscription {
   gym_member_id: string;
   plan_id: string;
   amount_paid: number;
+  /**
+   * The plan price at the moment of sale (migration 036). Not read from
+   * membership_plans at display time, because editing a plan's price must not
+   * rewrite what an old member was supposed to have paid. Null on rows sold
+   * before 036 whose plan has since been deleted.
+   */
+  plan_price: number | null;
   payment_method: string;
   start_date: string;
   end_date: string;
