@@ -302,6 +302,7 @@ export default function OwnerMembersListScreen() {
               photoUrl={item.profile?.photo_url}
               status={item.status}
               role={item.role}
+              hasAppLogin={!!item.profile?.clerk_id}
               subtitle={
                 // In the Expiring view the useful fact is WHEN, not the phone
                 // number — a list of names you must tap through isn't actionable.

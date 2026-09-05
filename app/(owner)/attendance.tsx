@@ -18,6 +18,7 @@ import Badge from '../../components/ui/Badge';
 import Card from '../../components/ui/Card';
 import Input from '../../components/ui/Input';
 import { formatDateTime, timeAgo } from '../../utils/date';
+import { useMembers } from '../../hooks/useMembers';
 
 interface AttendanceRecord {
   id: string;
@@ -37,6 +38,9 @@ export default function OwnerTodayAttendanceScreen() {
   const { gymId } = useAppAuth();
   const { colors, isDark } = useTheme();
   const { fetchTodayAttendance } = useCheckIns();
+  // Check-ins only exist for members who can scan the QR, so this count is what
+  // the numbers below are blind to.
+  const { withoutAppCount } = useMembers({ status: 'active', role: 'member' });
 
   const [records, setRecords] = useState<AttendanceRecord[]>([]);
   const [loading, setLoading] = useState(true);
@@ -167,6 +171,25 @@ export default function OwnerTodayAttendanceScreen() {
         </View>
       )}
 
+      {/* Without this the count above reads as the whole gym. Members the owner
+          registered at the desk cannot scan the QR, so they can never appear
+          here — and a low number would look like attendance falling rather than
+          attendance being partly invisible. */}
+      {withoutAppCount > 0 ? (
+        <View
+          style={[
+            styles.blindSpotNote,
+            { borderColor: colors.border, backgroundColor: colors.surface },
+          ]}
+        >
+          <Ionicons name="information-circle-outline" size={16} color={colors.info} />
+          <Text style={[styles.blindSpotText, { color: colors.textSecondary }]}>
+            {withoutAppCount} {withoutAppCount === 1 ? 'member has' : 'members have'} no app
+            login, so they never appear here even when they train.
+          </Text>
+        </View>
+      ) : null}
+
       {/* Check-ins List */}
       {loading && records.length === 0 ? (
         <View style={styles.loadingContainer}>
@@ -278,6 +301,18 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     marginRight: 12,
   },
+  blindSpotNote: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 8,
+    borderWidth: 1,
+    borderRadius: 12,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    marginHorizontal: 16,
+    marginBottom: 12,
+  },
+  blindSpotText: { flex: 1, fontSize: 12, lineHeight: 17 },
   headerTitleGroup: {
     flex: 1,
   },

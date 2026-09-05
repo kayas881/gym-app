@@ -645,6 +645,10 @@ export default function MemberDetailScreen() {
   // renewal he had already bought.
   // Only the plan being displayed on this card. Other subscriptions with their
   // own balances are listed on the Dues screen.
+  // Drives every "we cannot know this" state on this screen: no login means no
+  // way to scan the check-in QR.
+  const hasAppLogin = !!member?.profile?.clerk_id;
+
   const balanceDue = activeSubscription
     ? Math.max(
         Number(activeSubscription.plan_price ?? 0) -
@@ -1139,11 +1143,33 @@ export default function MemberDetailScreen() {
           <Text style={[styles.sectionSubtitle, { color: colors.textSecondary }]}>
             {/* The query limits to 30, so "30 check-ins" would understate a
                 long-standing member's real total. */}
-            {checkIns.length === 30 ? 'Last 30' : `${checkIns.length} check-ins`}
+            {hasAppLogin
+              ? checkIns.length === 30
+                ? 'Last 30'
+                : `${checkIns.length} check-ins`
+              : 'Not tracked'}
           </Text>
         </View>
 
-        {checkInsLoading ? (
+        {/* A member with no app login cannot scan the check-in QR, so an empty
+            list here means "we have no way of knowing", not "they never come".
+            Showing a bare zero would invite exactly the wrong conclusion about
+            somebody who trains every day. */}
+        {!hasAppLogin ? (
+          <Card padding={20}>
+            <View style={styles.emptySubs}>
+              <Ionicons name="help-circle-outline" size={32} color={colors.textTertiary} />
+              <Text style={[styles.emptySubsText, { color: colors.textSecondary }]}>
+                Attendance is not tracked for this member.
+              </Text>
+              <Text style={[styles.notTrackedHint, { color: colors.textTertiary }]}>
+                Check-ins are recorded when a member scans the gym QR with the
+                app. Give them a claim code above and their visits start
+                appearing here.
+              </Text>
+            </View>
+          </Card>
+        ) : checkInsLoading ? (
           <ActivityIndicator size="small" color={colors.primary} style={{ marginVertical: 20 }} />
         ) : checkIns.length === 0 ? (
           <Card padding={20}>
@@ -1728,6 +1754,12 @@ const styles = StyleSheet.create({
     marginBottom: 14,
   },
   requestedBannerText: { flex: 1, fontSize: 12, lineHeight: 17 },
+  notTrackedHint: {
+    fontSize: 12,
+    lineHeight: 17,
+    textAlign: 'center',
+    marginTop: 6,
+  },
   balanceRow: {
     flexDirection: 'row',
     alignItems: 'center',

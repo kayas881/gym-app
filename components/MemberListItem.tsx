@@ -7,6 +7,7 @@ import {
   StyleProp,
   ViewStyle,
 } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../lib/theme';
 import Avatar from './ui/Avatar';
 import StatusBadge, { MemberStatus } from './ui/StatusBadge';
@@ -21,6 +22,12 @@ export interface MemberListItemProps {
   subtitle?: string;
   /** Member has an open renewal request waiting on the owner. */
   hasRenewalRequest?: boolean;
+  /**
+   * False for a member the owner registered at the desk who has not claimed an
+   * app login. Worth showing in the list: they get no notifications and never
+   * appear in attendance, and they are who a claim code is for.
+   */
+  hasAppLogin?: boolean;
   onPress?: () => void;
   style?: StyleProp<ViewStyle>;
 }
@@ -32,6 +39,7 @@ export default function MemberListItem({
   role,
   subtitle,
   hasRenewalRequest = false,
+  hasAppLogin = true,
   onPress,
   style,
 }: MemberListItemProps) {
@@ -111,6 +119,13 @@ export default function MemberListItem({
               </Text>
             </View>
 
+            {!hasAppLogin ? (
+              <View style={[styles.noAppBadge, { borderColor: colors.border }]}>
+                <Ionicons name="phone-portrait-outline" size={10} color={colors.textTertiary} />
+                <Text style={[styles.noAppText, { color: colors.textTertiary }]}>NO APP</Text>
+              </View>
+            ) : null}
+
             {/* So the owner can see who is waiting while scrolling the list,
                 instead of having to open each profile to find out. */}
             {hasRenewalRequest ? (
@@ -186,6 +201,16 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     flexShrink: 1,
   },
+  noAppBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    borderWidth: 1,
+    paddingHorizontal: 5,
+    paddingVertical: 1.5,
+    borderRadius: 6,
+  },
+  noAppText: { fontSize: 9, fontWeight: '700', letterSpacing: 0.3 },
   roleBadge: {
     paddingHorizontal: 6,
     paddingVertical: 1.5,

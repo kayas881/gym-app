@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useSupabase } from './useSupabase';
 import { useAppAuth } from '../lib/auth';
 import { today, daysFromToday } from '../utils/date';
@@ -18,6 +18,12 @@ interface MemberWithProfile {
   active_end_date: string | null;
   profile: {
     id: string;
+    /**
+     * NULL when the gym owner created this member and no app login has been
+     * claimed yet (migrations 037/038). Drives every "we cannot know this"
+     * state: they cannot scan the check-in QR and receive no notifications.
+     */
+    clerk_id: string | null;
     full_name: string;
     email: string;
     phone: string | null;
@@ -91,6 +97,7 @@ export function useMembers(options: UseMembersOptions = {}) {
           joined_at,
           profile:profiles (
             id,
+            clerk_id,
             full_name,
             email,
             phone,
@@ -259,8 +266,20 @@ export function useMembers(options: UseMembersOptions = {}) {
     [supabase, fetchMembers]
   );
 
+  /**
+   * Members with no app login. Anything derived from check-ins — attendance
+   * counts, peak hours, streaks — silently excludes them, so screens showing
+   * those numbers need to say so rather than let the owner read a low figure as
+   * falling attendance.
+   */
+  const withoutAppCount = useMemo(
+    () => members.filter((m) => m.role === 'member' && !m.profile?.clerk_id).length,
+    [members]
+  );
+
   return {
     members,
+    withoutAppCount,
     loading,
     error,
     refresh: fetchMembers,
