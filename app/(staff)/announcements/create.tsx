@@ -17,6 +17,7 @@ import { useTheme } from '../../../lib/theme';
 import { useAnnouncements } from '../../../hooks/useAnnouncements';
 import Input from '../../../components/ui/Input';
 import Button from '../../../components/ui/Button';
+import { KEYBOARD_AVOID_BEHAVIOR } from '../../../constants/keyboard';
 
 type AudienceType = 'everyone' | 'active' | 'morning' | 'afternoon' | 'evening' | 'staff';
 
@@ -90,9 +91,12 @@ export default function StaffCreateAnnouncementScreen() {
   return (
     <KeyboardAvoidingView
       style={[styles.container, { backgroundColor: colors.background }]}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      behavior={KEYBOARD_AVOID_BEHAVIOR}
     >
       <ScrollView
+        // Without this the first tap while the keyboard is open only dismisses
+        // it, so a field or button below has to be tapped twice.
+        keyboardShouldPersistTaps="handled"
         contentContainerStyle={[
           styles.scrollContent,
           { paddingTop: Math.max(insets.top + 12, 44), paddingBottom: insets.bottom + 32 },

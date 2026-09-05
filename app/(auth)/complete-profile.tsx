@@ -22,6 +22,7 @@ import { useTheme } from '../../lib/theme';
 import { uploadImageAsset, isLocalFileUri } from '../../lib/storage';
 import { dateOfBirthError, parseIndianDate, toIndianDate } from '../../utils/date';
 import { Input, Button } from '../../components/ui';
+import { KEYBOARD_AVOID_BEHAVIOR } from '../../constants/keyboard';
 
 // Options for dropdowns.
 // `value` must match the CHECK constraints on public.profiles — the DB only
@@ -429,7 +430,7 @@ export default function CompleteProfileScreen() {
     >
       <KeyboardAvoidingView
         style={styles.keyboardContainer}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        behavior={KEYBOARD_AVOID_BEHAVIOR}
       >
         <ScrollView
           style={styles.scrollView}

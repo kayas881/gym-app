@@ -21,6 +21,7 @@ import Avatar from '../../components/ui/Avatar';
 import Input from '../../components/ui/Input';
 import Button from '../../components/ui/Button';
 import Card from '../../components/ui/Card';
+import { KEYBOARD_AVOID_BEHAVIOR } from '../../constants/keyboard';
 
 // Values must match the CHECK constraint on public.profiles.gender.
 const GENDER_OPTIONS = [
@@ -194,7 +195,7 @@ export default function StaffProfileScreen() {
   return (
     <KeyboardAvoidingView
       style={[styles.container, { backgroundColor: colors.background }]}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      behavior={KEYBOARD_AVOID_BEHAVIOR}
     >
       <ScrollView
         contentContainerStyle={[

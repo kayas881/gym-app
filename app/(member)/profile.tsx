@@ -23,6 +23,7 @@ import Avatar from '../../components/ui/Avatar';
 import Input from '../../components/ui/Input';
 import Button from '../../components/ui/Button';
 import Card from '../../components/ui/Card';
+import { KEYBOARD_AVOID_BEHAVIOR } from '../../constants/keyboard';
 
 const GENDER_OPTIONS = [
   { label: 'Male', value: 'male' },
@@ -246,9 +247,12 @@ export default function MemberProfileScreen() {
   return (
     <KeyboardAvoidingView
       style={[styles.container, { backgroundColor: colors.background }]}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      behavior={KEYBOARD_AVOID_BEHAVIOR}
     >
       <ScrollView
+        // Without this the first tap while the keyboard is open only dismisses
+        // it, so a field or button below has to be tapped twice.
+        keyboardShouldPersistTaps="handled"
         contentContainerStyle={[
           styles.scrollContent,
           { paddingTop: Math.max(insets.top + 12, 44), paddingBottom: insets.bottom + 32 },

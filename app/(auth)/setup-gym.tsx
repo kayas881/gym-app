@@ -24,6 +24,7 @@ import {
   parseTimeInput,
   serializeOperatingHours,
 } from '../../utils/operating-hours';
+import { KEYBOARD_AVOID_BEHAVIOR } from '../../constants/keyboard';
 
 type SetupTab = 'create' | 'join';
 
@@ -348,7 +349,7 @@ export default function SetupGymScreen() {
     >
       <KeyboardAvoidingView
         style={styles.keyboardContainer}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        behavior={KEYBOARD_AVOID_BEHAVIOR}
       >
         <ScrollView
           style={styles.scrollView}

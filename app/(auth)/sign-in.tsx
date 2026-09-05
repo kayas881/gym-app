@@ -16,6 +16,7 @@ import { useOAuth } from '@clerk/expo';
 import { useSignIn } from '@clerk/expo/legacy';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../../lib/theme';
+import { KEYBOARD_AVOID_BEHAVIOR } from '../../constants/keyboard';
 
 export default function SignInScreen() {
   const router = useRouter();
@@ -207,7 +208,7 @@ export default function SignInScreen() {
     return (
       <KeyboardAvoidingView
         style={[styles.keyboardContainer, { backgroundColor: colors.background }]}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        behavior={KEYBOARD_AVOID_BEHAVIOR}
       >
         <ScrollView
           contentContainerStyle={styles.scrollContainer}
@@ -339,7 +340,7 @@ export default function SignInScreen() {
   return (
     <KeyboardAvoidingView
       style={[styles.keyboardContainer, { backgroundColor: colors.background }]}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      behavior={KEYBOARD_AVOID_BEHAVIOR}
     >
       <ScrollView
         contentContainerStyle={styles.scrollContainer}

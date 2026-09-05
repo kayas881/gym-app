@@ -15,6 +15,7 @@ import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useSignIn } from '@clerk/expo/legacy';
 import { useTheme } from '../../lib/theme';
+import { KEYBOARD_AVOID_BEHAVIOR } from '../../constants/keyboard';
 
 /**
  * Password recovery.
@@ -135,7 +136,7 @@ export default function ForgotPasswordScreen() {
     <SafeAreaView style={[styles.safe, { backgroundColor: colors.background }]}>
       <KeyboardAvoidingView
         style={styles.flex}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        behavior={KEYBOARD_AVOID_BEHAVIOR}
       >
         <ScrollView
           contentContainerStyle={styles.content}

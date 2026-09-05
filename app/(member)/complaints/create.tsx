@@ -20,6 +20,7 @@ import { uploadImageAssetToPath } from '../../../lib/storage';
 import { useComplaints } from '../../../hooks/useComplaints';
 import Input from '../../../components/ui/Input';
 import Button from '../../../components/ui/Button';
+import { KEYBOARD_AVOID_BEHAVIOR } from '../../../constants/keyboard';
 
 export default function CreateComplaintScreen() {
   const router = useRouter();
@@ -180,9 +181,12 @@ export default function CreateComplaintScreen() {
   return (
     <KeyboardAvoidingView
       style={[styles.container, { backgroundColor: colors.background }]}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      behavior={KEYBOARD_AVOID_BEHAVIOR}
     >
       <ScrollView
+        // Without this the first tap while the keyboard is open only dismisses
+        // it, so a field or button below has to be tapped twice.
+        keyboardShouldPersistTaps="handled"
         contentContainerStyle={[
           styles.scrollContent,
           { paddingTop: Math.max(insets.top + 12, 44), paddingBottom: insets.bottom + 32 },

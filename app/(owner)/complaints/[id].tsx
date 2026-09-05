@@ -24,6 +24,7 @@ import Badge, { BadgeVariant } from '../../../components/ui/Badge';
 import Button from '../../../components/ui/Button';
 import Input from '../../../components/ui/Input';
 import { formatDateTime, timeAgo } from '../../../utils/date';
+import { KEYBOARD_AVOID_BEHAVIOR } from '../../../constants/keyboard';
 
 interface ComplaintDetail {
   id: string;
@@ -231,7 +232,7 @@ export default function OwnerComplaintDetailScreen() {
   return (
     <KeyboardAvoidingView
       style={[styles.screen, { backgroundColor: colors.background }]}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      behavior={KEYBOARD_AVOID_BEHAVIOR}
     >
       {/* Header */}
       <View style={styles.header}>
