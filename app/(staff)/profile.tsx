@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   View,
   Text,
@@ -8,6 +8,7 @@ import {
   StyleSheet,
   KeyboardAvoidingView,
   Platform,
+  Switch,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -74,6 +75,33 @@ export default function StaffProfileScreen() {
       );
     }
   }, [profile]);
+
+  const hasChanges = useMemo(() => {
+    if (!profile) return false;
+    const savedPhotoUrl = isLocalFileUri(profile.photo_url) ? null : profile.photo_url || null;
+    return (
+      fullName !== (profile.full_name || '') ||
+      phone !== (profile.phone || '') ||
+      dateOfBirth !== toIndianDate(profile.date_of_birth) ||
+      gender !== (profile.gender || '') ||
+      address !== (profile.address || '') ||
+      emergencyName !== (profile.emergency_contact_name || '') ||
+      emergencyPhone !== (profile.emergency_contact_phone || '') ||
+      photoUrl !== savedPhotoUrl ||
+      pendingPhotoAsset !== null
+    );
+  }, [
+    profile,
+    fullName,
+    phone,
+    dateOfBirth,
+    gender,
+    address,
+    emergencyName,
+    emergencyPhone,
+    photoUrl,
+    pendingPhotoAsset,
+  ]);
 
   const handlePickPhoto = async () => {
     try {
@@ -200,17 +228,24 @@ export default function StaffProfileScreen() {
       <ScrollView
         contentContainerStyle={[
           styles.scrollContent,
-          { paddingTop: insets.top + 16, paddingBottom: insets.bottom + 40 },
+          {
+            paddingTop: Math.max(insets.top + 12, 44),
+            paddingBottom: insets.bottom + (hasChanges ? 166 : 106),
+          },
         ]}
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >
-        <Text style={[styles.screenTitle, { color: colors.text }]}>My Profile</Text>
+        <View style={styles.header}>
+          <Text style={[styles.screenTitle, { color: colors.text }]}>Your Profile</Text>
+          <Text style={[styles.screenSubtitle, { color: colors.textSecondary }]}>
+            Staff identity, contact details and emergency information
+          </Text>
+        </View>
 
-        {/* Avatar */}
         <View style={styles.avatarSection}>
-          <TouchableOpacity onPress={handlePickPhoto} activeOpacity={0.8}>
-            <Avatar uri={photoUrl} name={fullName || 'Staff'} size={96} />
+          <TouchableOpacity onPress={handlePickPhoto} style={styles.avatarWrap} activeOpacity={0.8}>
+            <Avatar uri={photoUrl} name={fullName || 'Staff'} size={76} />
             <View
               style={[
                 styles.cameraBadge,
@@ -221,14 +256,19 @@ export default function StaffProfileScreen() {
             </View>
           </TouchableOpacity>
 
-          <Text style={[styles.roleLabel, { color: colors.textSecondary }]}>
-            {currentMembership?.gym?.name
-              ? `Staff at ${currentMembership.gym.name}`
-              : 'Staff'}
-          </Text>
+          <View style={styles.identityCopy}>
+            <Text style={[styles.identityName, { color: colors.text }]}>{fullName || 'Staff'}</Text>
+            <Text style={[styles.profileEmail, { color: colors.textSecondary }]}>{profile?.email}</Text>
+            <Text style={[styles.roleLabel, { color: colors.primary }]}>
+              {currentMembership?.gym?.name
+                ? `Staff at ${currentMembership.gym.name}`
+                : 'Gym staff'}
+            </Text>
+          </View>
         </View>
 
-        <Card>
+        <Card style={styles.sectionCard}>
+          <Text style={[styles.sectionTitle, { color: colors.text }]}>Personal Details</Text>
           <Input
             label="Full Name *"
             placeholder="Enter your full name"
@@ -292,10 +332,8 @@ export default function StaffProfileScreen() {
           />
         </Card>
 
-        <Text style={[styles.sectionTitle, { color: colors.text }]}>
-          Emergency Contact
-        </Text>
-        <Card>
+        <Card style={styles.sectionCard}>
+          <Text style={[styles.sectionTitle, { color: colors.text }]}>Emergency Contact</Text>
           <Input
             label="Contact Name"
             placeholder="e.g. Jane Doe"
@@ -312,20 +350,7 @@ export default function StaffProfileScreen() {
           />
         </Card>
 
-        <View style={styles.actions}>
-          <Button
-            title="Save Changes"
-            onPress={handleSave}
-            variant="primary"
-            size="lg"
-            loading={isSaving}
-            fullWidth
-          />
-        </View>
-
-        <TouchableOpacity
-          onPress={toggleTheme}
-          activeOpacity={0.7}
+        <View
           style={[
             styles.rowButton,
             { backgroundColor: colors.surface, borderColor: colors.border },
@@ -340,8 +365,13 @@ export default function StaffProfileScreen() {
           <Text style={[styles.rowText, { color: colors.text }]}>
             {isDark ? 'Dark Mode' : 'Light Mode'}
           </Text>
-          <Ionicons name="chevron-forward" size={18} color={colors.textTertiary} />
-        </TouchableOpacity>
+          <Switch
+            value={isDark}
+            onValueChange={toggleTheme}
+            trackColor={{ false: '#767577', true: colors.primaryLight }}
+            thumbColor={isDark ? colors.primary : '#f4f3f4'}
+          />
+        </View>
 
         <TouchableOpacity
           onPress={handleSignOut}
@@ -357,37 +387,71 @@ export default function StaffProfileScreen() {
           <Text style={[styles.signOutText, { color: colors.error }]}>Sign Out</Text>
         </TouchableOpacity>
       </ScrollView>
+
+      {hasChanges ? (
+        <View
+          style={[
+            styles.saveContainer,
+            {
+              bottom: Platform.OS === 'ios' ? 88 : 84,
+              backgroundColor: colors.background,
+              borderTopColor: colors.divider,
+            },
+          ]}
+        >
+          <Button
+            title="Save Changes"
+            onPress={handleSave}
+            variant="primary"
+            size="md"
+            loading={isSaving}
+            fullWidth
+            icon={<Ionicons name="save-outline" size={18} color="#11170B" />}
+          />
+        </View>
+      ) : null}
     </KeyboardAvoidingView>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  scrollContent: { paddingHorizontal: 20 },
+  scrollContent: { paddingHorizontal: 16 },
+  header: { marginBottom: 18 },
   screenTitle: {
-    fontSize: 26,
+    fontSize: 24,
     fontWeight: '800',
-    letterSpacing: -0.5,
-    marginBottom: 20,
+    letterSpacing: -0.4,
+    marginBottom: 4,
   },
-  avatarSection: { alignItems: 'center', marginBottom: 24 },
+  screenSubtitle: { fontSize: 14 },
+  avatarSection: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 18,
+    paddingHorizontal: 4,
+  },
+  avatarWrap: { position: 'relative', marginRight: 14 },
   cameraBadge: {
     position: 'absolute',
-    bottom: 0,
-    right: 0,
-    width: 30,
-    height: 30,
-    borderRadius: 15,
+    bottom: 2,
+    right: 2,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
     borderWidth: 2,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  roleLabel: { marginTop: 10, fontSize: 14, fontWeight: '500' },
+  identityCopy: { flex: 1 },
+  identityName: { fontSize: 18, fontWeight: '800', marginBottom: 2 },
+  profileEmail: { fontSize: 12, marginBottom: 4 },
+  roleLabel: { fontSize: 13, fontWeight: '700' },
+  sectionCard: { marginBottom: 16 },
   sectionTitle: {
     fontSize: 16,
     fontWeight: '700',
-    marginTop: 20,
-    marginBottom: 10,
+    marginBottom: 14,
   },
   fieldLabel: { fontSize: 14, fontWeight: '500', marginBottom: 8, marginTop: 4 },
   chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
@@ -398,7 +462,6 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
   chipText: { fontSize: 13, fontWeight: '600' },
-  actions: { marginTop: 20, marginBottom: 12 },
   rowButton: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -417,4 +480,13 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
   },
   signOutText: { fontSize: 15, fontWeight: '600' },
+  saveContainer: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    zIndex: 10,
+  },
 });

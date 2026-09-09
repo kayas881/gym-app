@@ -29,6 +29,7 @@ const GENDER_OPTIONS = [
   { label: 'Male', value: 'male' },
   { label: 'Female', value: 'female' },
   { label: 'Other', value: 'other' },
+  { label: 'Prefer not to say', value: 'prefer_not_to_say' },
 ];
 
 const FITNESS_GOALS = [
@@ -255,15 +256,18 @@ export default function MemberProfileScreen() {
         keyboardShouldPersistTaps="handled"
         contentContainerStyle={[
           styles.scrollContent,
-          { paddingTop: Math.max(insets.top + 12, 44), paddingBottom: insets.bottom + 32 },
+          {
+            paddingTop: Math.max(insets.top + 12, 44),
+            paddingBottom: insets.bottom + (hasChanges ? 166 : 106),
+          },
         ]}
         showsVerticalScrollIndicator={false}
       >
         {/* Header */}
         <View style={styles.header}>
-          <Text style={[styles.title, { color: colors.text }]}>Profile & Settings</Text>
+          <Text style={[styles.title, { color: colors.text }]}>Your Profile</Text>
           <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
-            Manage your personal fitness details and preferences
+            Identity, training preferences and safety details
           </Text>
         </View>
 
@@ -274,17 +278,18 @@ export default function MemberProfileScreen() {
             style={styles.avatarWrap}
             activeOpacity={0.8}
           >
-            <Avatar uri={photoUrl} name={fullName || 'Member'} size={96} />
+            <Avatar uri={photoUrl} name={fullName || 'Member'} size={76} />
             <View style={[styles.cameraBadge, { backgroundColor: colors.primary }]}>
               <Ionicons name="camera" size={18} color="#000000" />
             </View>
           </TouchableOpacity>
-          <Text style={[styles.profileEmail, { color: colors.textSecondary }]}>
-            {profile?.email}
-          </Text>
-          <Text style={[styles.gymBadgeText, { color: colors.primary }]}>
-            {currentMembership?.gym?.name || 'Active Member'}
-          </Text>
+          <View style={styles.identityCopy}>
+            <Text style={[styles.identityName, { color: colors.text }]}>{fullName || 'Member'}</Text>
+            <Text style={[styles.profileEmail, { color: colors.textSecondary }]}>{profile?.email}</Text>
+            <Text style={[styles.gymBadgeText, { color: colors.primary }]}>
+              Member at {currentMembership?.gym?.name || 'your gym'}
+            </Text>
+          </View>
         </View>
 
         {/* Personal Details Section */}
@@ -531,21 +536,6 @@ export default function MemberProfileScreen() {
           </View>
         </Card>
 
-        {/* Save Button (when changes detected) */}
-        {hasChanges && (
-          <View style={styles.saveContainer}>
-            <Button
-              title="Save Changes"
-              onPress={handleSaveProfile}
-              variant="primary"
-              size="lg"
-              loading={isSaving}
-              fullWidth
-              icon={<Ionicons name="save-outline" size={20} color="#000000" />}
-            />
-          </View>
-        )}
-
         {/* Sign Out Button */}
         <View style={styles.signOutContainer}>
           <Button
@@ -558,6 +548,29 @@ export default function MemberProfileScreen() {
           />
         </View>
       </ScrollView>
+
+      {hasChanges ? (
+        <View
+          style={[
+            styles.saveContainer,
+            {
+              bottom: Platform.OS === 'ios' ? 88 : 84,
+              backgroundColor: colors.background,
+              borderTopColor: colors.divider,
+            },
+          ]}
+        >
+          <Button
+            title="Save Changes"
+            onPress={handleSaveProfile}
+            variant="primary"
+            size="md"
+            loading={isSaving}
+            fullWidth
+            icon={<Ionicons name="save-outline" size={18} color="#11170B" />}
+          />
+        </View>
+      ) : null}
     </KeyboardAvoidingView>
   );
 }
@@ -582,29 +595,33 @@ const styles = StyleSheet.create({
     fontSize: 14,
   },
   avatarSection: {
+    flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 24,
+    marginBottom: 18,
+    paddingHorizontal: 4,
   },
   avatarWrap: {
     position: 'relative',
-    marginBottom: 10,
+    marginRight: 14,
   },
   cameraBadge: {
     position: 'absolute',
     bottom: 2,
     right: 2,
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 2,
     borderColor: '#000000',
   },
   profileEmail: {
-    fontSize: 14,
+    fontSize: 12,
     marginBottom: 4,
   },
+  identityCopy: { flex: 1 },
+  identityName: { fontSize: 18, fontWeight: '800', marginBottom: 2 },
   gymBadgeText: {
     fontSize: 13,
     fontWeight: '700',
@@ -673,7 +690,13 @@ const styles = StyleSheet.create({
     fontSize: 12,
   },
   saveContainer: {
-    marginBottom: 14,
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    zIndex: 10,
   },
   signOutContainer: {
     marginTop: 6,
