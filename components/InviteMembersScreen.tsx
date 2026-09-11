@@ -83,7 +83,7 @@ export default function InviteMembersScreen() {
     try {
       await Share.share({
         message:
-          `Join ${displayName} on Gym App.\n\n` +
+          `Join ${displayName} on Gymnos.\n\n` +
           `Gym code: ${joinCode}\n\n` +
           `Install the app, sign up, tap "Join Gym" and enter the code above.`,
       });
@@ -219,7 +219,7 @@ export default function InviteMembersScreen() {
                   {joinCode}
                 </Text>
                 <Text style={styles.posterFoot}>
-                  Sign up on Gym App, tap Join Gym, enter the code
+                  Sign up on Gymnos, tap Join Gym, enter the code
                 </Text>
               </View>
             </View>

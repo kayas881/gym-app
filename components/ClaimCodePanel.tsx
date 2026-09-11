@@ -122,7 +122,7 @@ export default function ClaimCodePanel({ gymMemberId, memberName, hasAppLogin }:
       await Share.share({
         message:
           `Hi ${memberName}, your gym membership is already set up.\n\n` +
-          `Install Gym App, sign up, then enter this code to see your plan and payments:\n\n` +
+          `Install Gymnos, sign up, then enter this code to see your plan and payments:\n\n` +
           `${code.code}\n\n` +
           `The code works once and expires on ${formatDateTime(code.expires_at)}.`,
       });

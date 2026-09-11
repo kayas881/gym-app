@@ -31,7 +31,7 @@ async function ensureAndroidChannel(): Promise<void> {
     name: 'Gym Updates',
     importance: Notifications.AndroidImportance.DEFAULT,
     vibrationPattern: [0, 250, 250, 250],
-    lightColor: '#00E676',
+    lightColor: '#B7F34A',
   });
 }
 

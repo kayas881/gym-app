@@ -1,4 +1,4 @@
-# Gym App — agent briefing
+# Gymnos — agent briefing
 
 A React Native / Expo gym management app for a single real gym in India. Three
 roles — owner, staff, member — in expo-router route groups `(auth)`, `(owner)`,

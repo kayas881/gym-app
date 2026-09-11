@@ -109,7 +109,7 @@ export default function IndexScreen() {
       <View style={[styles.container, styles.centered, { backgroundColor: colors.background }]}>
         <ActivityIndicator size="large" color={colors.primary} />
         <Text style={[styles.loadingText, { color: colors.textSecondary }]}>
-          Loading Gym App...
+          Loading Gymnos...
         </Text>
       </View>
     );

@@ -50,7 +50,7 @@ export function generateReceiptHTML(data: ReceiptData): string {
     }
     .header h1 {
       font-size: 24px;
-      color: #00E676;
+      color: #B7F34A;
       margin-bottom: 4px;
     }
     .header p {
@@ -59,7 +59,7 @@ export function generateReceiptHTML(data: ReceiptData): string {
     }
     .receipt-number {
       background: #1a1a1a;
-      color: #00E676;
+      color: #B7F34A;
       text-align: center;
       padding: 8px;
       font-size: 14px;

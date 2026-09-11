@@ -747,7 +747,7 @@ const styles = StyleSheet.create({
     width: 240,
     height: 240,
     borderWidth: 3,
-    borderColor: '#00E676',
+    borderColor: '#B7F34A',
     borderRadius: 20,
     backgroundColor: 'transparent',
   },

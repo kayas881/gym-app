@@ -440,7 +440,7 @@ export default function MemberScanScreen() {
               </Text>
               {isProcessing && (
                 <View style={styles.processingRow}>
-                  <ActivityIndicator size="small" color="#00E676" />
+                  <ActivityIndicator size="small" color="#B7F34A" />
                   <Text style={styles.processingText}>Validating check-in...</Text>
                 </View>
               )}
@@ -557,7 +557,7 @@ const styles = StyleSheet.create({
     width: '100%',
     height: 2.5,
     borderRadius: 2,
-    shadowColor: '#00E676',
+    shadowColor: '#B7F34A',
     shadowOffset: { width: 0, height: 0 },
     shadowOpacity: 0.8,
     shadowRadius: 6,
@@ -583,7 +583,7 @@ const styles = StyleSheet.create({
     marginTop: 16,
   },
   processingText: {
-    color: '#00E676',
+    color: '#B7F34A',
     fontSize: 14,
     fontWeight: '600',
   },

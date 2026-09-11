@@ -1,23 +1,23 @@
 {
   "expo": {
-    "name": "Gym App",
+    "name": "Gymnos",
     "slug": "my-gym-app",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "automatic",
-    "scheme": "gym-app",
+    "scheme": "gymnos",
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.kayas.mygymapp",
       "infoPlist": {
-        "NSCameraUsageDescription": "This app uses the camera to scan QR codes for gym check-in."
+        "NSCameraUsageDescription": "Allow Gymnos to access your camera to scan your gym’s join and check-in codes, and to photograph issues you report."
       }
     },
     "android": {
       "googleServicesFile": "./google-services.json",
       "adaptiveIcon": {
-        "backgroundColor": "#0F0F0F",
+        "backgroundColor": "#0A0C0B",
         "foregroundImage": "./assets/android-icon-foreground.png",
         "backgroundImage": "./assets/android-icon-background.png",
         "monochromeImage": "./assets/android-icon-monochrome.png",
@@ -37,25 +37,33 @@
       "expo-router",
       "expo-status-bar",
       "expo-font",
-      "expo-splash-screen",
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/splash-icon.png",
+          "imageWidth": 200,
+          "resizeMode": "contain",
+          "backgroundColor": "#0A0C0B"
+        }
+      ],
       "expo-secure-store",
       [
         "expo-camera",
         {
-          "cameraPermission": "Allow Gym App to access your camera to scan your gym’s join and check-in codes, and to photograph issues you report."
+          "cameraPermission": "Allow Gymnos to access your camera to scan your gym’s join and check-in codes, and to photograph issues you report."
         }
       ],
       [
         "expo-image-picker",
         {
-          "photosPermission": "Allow Gym App to access your photos to set a profile picture."
+          "photosPermission": "Allow Gymnos to access your photos to set a profile picture."
         }
       ],
       "expo-web-browser",
       [
         "expo-notifications",
         {
-          "color": "#00E676",
+          "color": "#B7F34A",
           "defaultChannel": "default"
         }
       ]
