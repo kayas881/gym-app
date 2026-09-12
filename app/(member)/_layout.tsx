@@ -1,5 +1,5 @@
 import React from 'react';
-import { StyleSheet, Platform } from 'react-native';
+import { StyleSheet, Platform, View } from 'react-native';
 import { Tabs } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../../lib/theme';
@@ -13,16 +13,21 @@ export default function MemberLayout() {
         headerShown: false,
         tabBarStyle: {
           backgroundColor: colors.tabBar,
-          borderTopColor: colors.border,
-          borderTopWidth: 1,
-          height: Platform.OS === 'ios' ? 88 : 64,
-          paddingBottom: Platform.OS === 'ios' ? 28 : 10,
-          paddingTop: 8,
-          elevation: 8,
+          borderColor: colors.border,
+          borderWidth: 1,
+          height: Platform.OS === 'ios' ? 82 : 68,
+          paddingBottom: Platform.OS === 'ios' ? 22 : 7,
+          paddingTop: 7,
+          position: 'absolute',
+          left: 12,
+          right: 12,
+          bottom: Platform.OS === 'ios' ? 4 : 8,
+          borderRadius: 22,
+          elevation: 12,
           shadowColor: colors.shadow,
-          shadowOffset: { width: 0, height: -2 },
-          shadowOpacity: 0.1,
-          shadowRadius: 4,
+          shadowOffset: { width: 0, height: 6 },
+          shadowOpacity: 0.28,
+          shadowRadius: 14,
         },
         tabBarActiveTintColor: colors.tabBarActive,
         tabBarInactiveTintColor: colors.tabBarInactive,
@@ -34,11 +39,9 @@ export default function MemberLayout() {
         options={{
           title: 'Home',
           tabBarIcon: ({ color, size, focused }) => (
-            <Ionicons
-              name={focused ? 'home' : 'home-outline'}
-              size={size}
-              color={color}
-            />
+            <View style={[styles.iconWrap, focused && { backgroundColor: colors.primaryMuted }]}>
+              <Ionicons name={focused ? 'home' : 'home-outline'} size={size - 1} color={color} />
+            </View>
           ),
         }}
       />
@@ -47,24 +50,9 @@ export default function MemberLayout() {
         options={{
           title: 'Attendance',
           tabBarIcon: ({ color, size, focused }) => (
-            <Ionicons
-              name={focused ? 'calendar' : 'calendar-outline'}
-              size={size}
-              color={color}
-            />
-          ),
-        }}
-      />
-      <Tabs.Screen
-        name="announcements"
-        options={{
-          title: 'Announcements',
-          tabBarIcon: ({ color, size, focused }) => (
-            <Ionicons
-              name={focused ? 'megaphone' : 'megaphone-outline'}
-              size={size}
-              color={color}
-            />
+            <View style={[styles.iconWrap, focused && { backgroundColor: colors.primaryMuted }]}>
+              <Ionicons name={focused ? 'calendar' : 'calendar-outline'} size={size - 1} color={color} />
+            </View>
           ),
         }}
       />
@@ -72,12 +60,22 @@ export default function MemberLayout() {
         name="scan"
         options={{
           title: 'Check In',
+          tabBarStyle: { display: 'none' },
           tabBarIcon: ({ color, size, focused }) => (
-            <Ionicons
-              name={focused ? 'qr-code' : 'qr-code-outline'}
-              size={size}
-              color={color}
-            />
+            <View style={[styles.iconWrap, focused && { backgroundColor: colors.primaryMuted }]}>
+              <Ionicons name={focused ? 'qr-code' : 'qr-code-outline'} size={size - 1} color={color} />
+            </View>
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="announcements"
+        options={{
+          title: 'Updates',
+          tabBarIcon: ({ color, size, focused }) => (
+            <View style={[styles.iconWrap, focused && { backgroundColor: colors.primaryMuted }]}>
+              <Ionicons name={focused ? 'megaphone' : 'megaphone-outline'} size={size - 1} color={color} />
+            </View>
           ),
         }}
       />
@@ -86,29 +84,34 @@ export default function MemberLayout() {
         options={{
           title: 'Profile',
           tabBarIcon: ({ color, size, focused }) => (
-            <Ionicons
-              name={focused ? 'person' : 'person-outline'}
-              size={size}
-              color={color}
-            />
+            <View style={[styles.iconWrap, focused && { backgroundColor: colors.primaryMuted }]}>
+              <Ionicons name={focused ? 'person' : 'person-outline'} size={size - 1} color={color} />
+            </View>
           ),
         }}
       />
 
       {/* Pushed from home/profile — not tabs. */}
-      <Tabs.Screen name="payments" options={{ href: null }} />
-      <Tabs.Screen name="gym-info" options={{ href: null }} />
-      <Tabs.Screen name="renew" options={{ href: null }} />
-      <Tabs.Screen name="complaints/index" options={{ href: null }} />
-      <Tabs.Screen name="complaints/create" options={{ href: null }} />
+      <Tabs.Screen name="payments" options={{ href: null, tabBarStyle: { display: 'none' } }} />
+      <Tabs.Screen name="gym-info" options={{ href: null, tabBarStyle: { display: 'none' } }} />
+      <Tabs.Screen name="renew" options={{ href: null, tabBarStyle: { display: 'none' } }} />
+      <Tabs.Screen name="complaints/index" options={{ href: null, tabBarStyle: { display: 'none' } }} />
+      <Tabs.Screen name="complaints/create" options={{ href: null, tabBarStyle: { display: 'none' } }} />
     </Tabs>
   );
 }
 
 const styles = StyleSheet.create({
   tabBarLabel: {
-    fontSize: 12,
-    fontWeight: '600',
-    marginTop: -2,
+    fontSize: 10,
+    fontWeight: '700',
+    marginTop: -3,
+  },
+  iconWrap: {
+    width: 38,
+    height: 28,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 });

@@ -14,7 +14,6 @@ import { useRouter, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useAppAuth } from '../../lib/auth';
 import { useTheme } from '../../lib/theme';
-import StatCard from '../../components/StatCard';
 import DuesBanner from '../../components/DuesBanner';
 import PeakHoursChart from '../../components/PeakHoursChart';
 import Avatar from '../../components/ui/Avatar';
@@ -49,7 +48,7 @@ interface RecentCheckIn {
 export default function OwnerDashboardScreen() {
   const router = useRouter();
   const { profile, gymId, currentMembership, supabase } = useAppAuth();
-  const { colors, isDark } = useTheme();
+  const { colors } = useTheme();
 
   const [stats, setStats] = useState<DashboardStats>({
     activeMembers: 0,
@@ -305,17 +304,18 @@ export default function OwnerDashboardScreen() {
           />
         }
       >
-        {/* Header Greeting */}
+        {/* A working header, not a marketing greeting: gym context and the
+            date are visible before the owner starts scanning numbers. */}
         <View style={styles.header}>
           <View style={styles.headerTextGroup}>
-            <Text style={[styles.greetingText, { color: colors.text }]}>
-              Hello, {ownerName} 👋
+            <Text style={[styles.dateText, { color: colors.textSecondary }]}>
+              {todayFormatted.toUpperCase()}
             </Text>
-            <Text style={[styles.gymSubTitle, { color: colors.primary }]}>
+            <Text style={[styles.greetingText, { color: colors.text }]}>
               {gymName}
             </Text>
-            <Text style={[styles.dateText, { color: colors.textSecondary }]}>
-              {todayFormatted}
+            <Text style={[styles.gymSubTitle, { color: colors.textSecondary }]}>
+              Owner workspace · {ownerName}
             </Text>
           </View>
 
@@ -337,6 +337,32 @@ export default function OwnerDashboardScreen() {
           </View>
         ) : (
           <>
+            {/* Revenue is the lead number because it tells the owner how the
+                business is moving. Supporting operational counts sit together
+                below instead of competing as four equally loud cards. */}
+            <TouchableOpacity
+              style={[
+                styles.revenueHero,
+                { backgroundColor: colors.card, borderColor: colors.border },
+              ]}
+              onPress={() => router.push('/(owner)/payments')}
+              activeOpacity={0.88}
+            >
+              <View style={styles.revenueHeroTop}>
+                <Text style={[styles.revenueEyebrow, { color: colors.primary }]}>REVENUE · THIS MONTH</Text>
+              </View>
+              <Text style={[styles.revenueValue, { color: colors.text }]}>
+                ₹{stats.revenueThisMonth.toLocaleString('en-IN')}
+              </Text>
+              <View style={styles.revenueFooter}>
+                <Text style={[styles.revenueCaption, { color: colors.textSecondary }]}>Payments collected</Text>
+                <View style={styles.revenueLinkRow}>
+                  <Text style={[styles.revenueLink, { color: colors.primary }]}>Open payments</Text>
+                  <Ionicons name="arrow-forward" size={15} color={colors.primary} />
+                </View>
+              </View>
+            </TouchableOpacity>
+
             {/* Renewal requests need their own row rather than a number in the
                 Pending card: they are the one thing on this screen that costs
                 the owner money to ignore. */}
@@ -372,157 +398,131 @@ export default function OwnerDashboardScreen() {
                 "Revenue 2,300" and had no way to reach the 200 outstanding. */}
             <DuesBanner />
 
-            {/* Stat Cards Grid */}
-            <View style={styles.statsSection}>
-              <View style={styles.statsRow}>
-                <StatCard
-                  title="Members"
-                  value={stats.activeMembers}
-                  subtitle="Active, paying"
-                  icon="people-outline"
-                  color={colors.statusActive}
-                  onPress={() => router.push('/(owner)/members?status=active')}
-                  style={styles.statCardHalf}
-                />
-
-                <StatCard
-                  title="Pending"
-                  value={stats.pendingApprovals}
-                  subtitle={stats.pendingApprovals > 0 ? 'Action required' : 'All clear'}
-                  icon="time-outline"
-                  color={colors.statusPending}
-                  onPress={() => router.push('/(owner)/members/pending')}
-                  style={styles.statCardHalf}
-                />
-              </View>
-
-              <View style={styles.statsRow}>
-                <StatCard
-                  title="Revenue"
-                  value={`₹${stats.revenueThisMonth.toLocaleString('en-IN')}`}
-                  subtitle="This month"
-                  icon="cash-outline"
-                  color={colors.info}
-                  // Revenue belongs in payment history, not the member list.
-                  onPress={() => router.push('/(owner)/payments')}
-                  style={styles.statCardHalf}
-                />
-
-                <StatCard
-                  title="Expiring"
-                  value={stats.expiringSoon}
-                  subtitle="Within 7 days"
-                  icon="alert-circle-outline"
-                  color={colors.statusExpired}
-                  // Goes to the derived "Expiring" filter — those members are
-                  // still 'active', so the Expired tab would be empty.
-                  onPress={() => router.push('/(owner)/members?status=expiring')}
-                  style={styles.statCardHalf}
-                />
-              </View>
+            <View style={[styles.metricsPanel, { backgroundColor: colors.card, borderColor: colors.border }]}>
+              <TouchableOpacity
+                style={styles.metricItem}
+                onPress={() => router.push('/(owner)/members?status=active')}
+                activeOpacity={0.7}
+              >
+                <Text style={[styles.metricValue, { color: colors.text }]}>{stats.activeMembers}</Text>
+                <Text style={[styles.metricLabel, { color: colors.textSecondary }]}>ACTIVE{`\n`}MEMBERS</Text>
+              </TouchableOpacity>
+              <View style={[styles.metricDivider, { backgroundColor: colors.divider }]} />
+              <TouchableOpacity
+                style={styles.metricItem}
+                onPress={() => router.push('/(owner)/members/pending')}
+                activeOpacity={0.7}
+              >
+                <Text style={[styles.metricValue, { color: stats.pendingApprovals ? colors.warning : colors.text }]}>
+                  {stats.pendingApprovals}
+                </Text>
+                <Text style={[styles.metricLabel, { color: colors.textSecondary }]}>PENDING{`\n`}APPROVALS</Text>
+              </TouchableOpacity>
+              <View style={[styles.metricDivider, { backgroundColor: colors.divider }]} />
+              <TouchableOpacity
+                style={styles.metricItem}
+                onPress={() => router.push('/(owner)/members?status=expiring')}
+                activeOpacity={0.7}
+              >
+                <Text style={[styles.metricValue, { color: stats.expiringSoon ? colors.error : colors.text }]}>
+                  {stats.expiringSoon}
+                </Text>
+                <Text style={[styles.metricLabel, { color: colors.textSecondary }]}>EXPIRING{`\n`}IN 7 DAYS</Text>
+              </TouchableOpacity>
             </View>
 
-            {/* Quick Actions */}
+            {/* The two desk tasks get prominent targets; lower-frequency
+                configuration lives in a quieter, scannable tools list. */}
             <View style={styles.sectionHeaderRow}>
-              <Text style={[styles.sectionTitle, { color: colors.text }]}>
-                Quick Actions
-              </Text>
+              <View>
+                <Text style={[styles.sectionEyebrow, { color: colors.primary }]}>FRONT DESK</Text>
+                <Text style={[styles.sectionTitle, { color: colors.text }]}>Run the gym</Text>
+              </View>
             </View>
 
-            <View style={styles.quickActionsContainer}>
+            <View
+              style={[
+                styles.quickActionsContainer,
+                { borderTopColor: colors.border, borderBottomColor: colors.border },
+              ]}
+            >
               <TouchableOpacity
-                style={[
-                  styles.quickActionButton,
-                  { backgroundColor: colors.surface, borderColor: colors.border },
-                ]}
-                // The record-payment screen has its own "Select Member" step,
-                // so send the owner straight there rather than dumping them on
-                // the member list with no explanation of what to do next.
+                style={styles.primaryAction}
+                onPress={() => router.push('/(owner)/members/add')}
+                activeOpacity={0.84}
+              >
+                <Text style={[styles.actionNumber, { color: colors.primary }]}>01</Text>
+                <View style={styles.primaryActionCopy}>
+                  <Text style={[styles.primaryActionTitle, { color: colors.text }]}>Add member</Text>
+                  <Text style={[styles.primaryActionSubtitle, { color: colors.textSecondary }]}>Create a member record</Text>
+                </View>
+                <Ionicons name="arrow-forward" size={20} color={colors.primary} />
+              </TouchableOpacity>
+
+              <View style={[styles.actionDivider, { backgroundColor: colors.divider }]} />
+
+              <TouchableOpacity
+                style={styles.primaryAction}
+                // The record-payment screen has its own member picker, so this
+                // can go directly to collection without an intermediate list.
                 onPress={() => router.push('/(owner)/payments/record')}
-                activeOpacity={0.7}
+                activeOpacity={0.84}
               >
-                <View style={[styles.quickActionIconCircle, { backgroundColor: isDark ? 'rgba(0, 230, 118, 0.15)' : 'rgba(0, 200, 83, 0.12)' }]}>
-                  <Ionicons name="card-outline" size={22} color={colors.primary} />
+                <Text style={[styles.actionNumber, { color: colors.textTertiary }]}>02</Text>
+                <View style={styles.primaryActionCopy}>
+                  <Text style={[styles.primaryActionTitle, { color: colors.text }]}>Record payment</Text>
+                  <Text style={[styles.primaryActionSubtitle, { color: colors.textSecondary }]}>Collect or renew a plan</Text>
                 </View>
-                <Text style={[styles.quickActionText, { color: colors.text }]}>
-                  Record Payment
-                </Text>
+                <Ionicons name="arrow-forward" size={19} color={colors.textTertiary} />
               </TouchableOpacity>
+            </View>
 
+            <View style={[styles.toolsPanel, { backgroundColor: colors.card, borderColor: colors.border }]}>
               <TouchableOpacity
-                style={[
-                  styles.quickActionButton,
-                  { backgroundColor: colors.surface, borderColor: colors.border },
-                ]}
-                onPress={() => setAnnouncementModalVisible(true)}
-                activeOpacity={0.7}
-              >
-                <View style={[styles.quickActionIconCircle, { backgroundColor: isDark ? 'rgba(68, 138, 255, 0.15)' : 'rgba(25, 118, 210, 0.12)' }]}>
-                  <Ionicons name="megaphone-outline" size={22} color={colors.info} />
-                </View>
-                <Text style={[styles.quickActionText, { color: colors.text }]}>
-                  Post Announcement
-                </Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={[
-                  styles.quickActionButton,
-                  { backgroundColor: colors.surface, borderColor: colors.border },
-                ]}
-                onPress={() => setComplaintsModalVisible(true)}
-                activeOpacity={0.7}
-              >
-                <View style={[styles.quickActionIconCircle, { backgroundColor: isDark ? 'rgba(255, 179, 0, 0.15)' : 'rgba(245, 127, 23, 0.12)' }]}>
-                  <Ionicons name="chatbubble-ellipses-outline" size={22} color={colors.warning} />
-                </View>
-                <View style={styles.actionLabelContainer}>
-                  <Text style={[styles.quickActionText, { color: colors.text }]}>
-                    Complaints
-                  </Text>
-                  {complaintCounts.new > 0 && (
-                    <View style={[styles.miniBadge, { backgroundColor: colors.error }]}>
-                      <Text style={styles.miniBadgeText}>{complaintCounts.new}</Text>
-                    </View>
-                  )}
-                </View>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={[
-                  styles.quickActionButton,
-                  { backgroundColor: colors.surface, borderColor: colors.border },
-                ]}
-                onPress={() => router.push('/(owner)/plans')}
-                activeOpacity={0.7}
-              >
-                <View style={[styles.quickActionIconCircle, { backgroundColor: isDark ? 'rgba(158, 158, 158, 0.15)' : 'rgba(0, 0, 0, 0.06)' }]}>
-                  <Ionicons name="pricetags-outline" size={22} color={colors.textSecondary} />
-                </View>
-                <Text style={[styles.quickActionText, { color: colors.text }]}>
-                  Manage Plans
-                </Text>
-              </TouchableOpacity>
-
-              {/*
-                The announcements feed had no entry point at all: the quick
-                action above only opens the compose modal, so an owner could
-                post but never review what they or their staff had posted.
-              */}
-              <TouchableOpacity
-                style={[
-                  styles.quickActionButton,
-                  { backgroundColor: colors.surface, borderColor: colors.border },
-                ]}
+                style={styles.toolRow}
                 onPress={() => router.push('/(owner)/announcements')}
                 activeOpacity={0.7}
               >
-                <View style={[styles.quickActionIconCircle, { backgroundColor: isDark ? 'rgba(68, 138, 255, 0.15)' : 'rgba(25, 118, 210, 0.12)' }]}>
-                  <Ionicons name="list-outline" size={22} color={colors.info} />
+                <View style={[styles.toolMarker, { backgroundColor: colors.info }]} />
+                <View style={styles.toolCopy}>
+                  <Text style={[styles.toolTitle, { color: colors.text }]}>Announcements</Text>
+                  <Text style={[styles.toolSubtitle, { color: colors.textSecondary }]}>Create and review gym updates</Text>
                 </View>
-                <Text style={[styles.quickActionText, { color: colors.text }]}>
-                  All Announcements
-                </Text>
+                <Ionicons name="chevron-forward" size={18} color={colors.textTertiary} />
+              </TouchableOpacity>
+              <View style={[styles.toolDivider, { backgroundColor: colors.divider }]} />
+
+              <TouchableOpacity
+                style={styles.toolRow}
+                onPress={() => router.push('/(owner)/complaints')}
+                activeOpacity={0.7}
+              >
+                <View style={[styles.toolMarker, { backgroundColor: colors.warning }]} />
+                <View style={styles.toolCopy}>
+                  <Text style={[styles.toolTitle, { color: colors.text }]}>Member issues</Text>
+                  <Text style={[styles.toolSubtitle, { color: colors.textSecondary }]}>Read and resolve complaints</Text>
+                </View>
+                {complaintCounts.new > 0 ? (
+                  <View style={[styles.countBadge, { backgroundColor: colors.error }]}>
+                    <Text style={styles.countBadgeText}>{complaintCounts.new}</Text>
+                  </View>
+                ) : (
+                  <Ionicons name="chevron-forward" size={18} color={colors.textTertiary} />
+                )}
+              </TouchableOpacity>
+              <View style={[styles.toolDivider, { backgroundColor: colors.divider }]} />
+
+              <TouchableOpacity
+                style={styles.toolRow}
+                onPress={() => router.push('/(owner)/plans')}
+                activeOpacity={0.7}
+              >
+                <View style={[styles.toolMarker, { backgroundColor: colors.primary }]} />
+                <View style={styles.toolCopy}>
+                  <Text style={[styles.toolTitle, { color: colors.text }]}>Plans & pricing</Text>
+                  <Text style={[styles.toolSubtitle, { color: colors.textSecondary }]}>Manage what members can buy</Text>
+                </View>
+                <Ionicons name="chevron-forward" size={18} color={colors.textTertiary} />
               </TouchableOpacity>
             </View>
 
@@ -929,39 +929,40 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   scrollContent: {
-    paddingHorizontal: 16,
-    paddingTop: 54,
-    paddingBottom: 40,
+    paddingHorizontal: 18,
+    paddingTop: 52,
+    paddingBottom: 118,
   },
   header: {
     flexDirection: 'row',
     alignItems: 'flex-start',
     justifyContent: 'space-between',
-    marginBottom: 20,
+    marginBottom: 22,
   },
   headerTextGroup: {
     flex: 1,
     marginRight: 12,
   },
   greetingText: {
-    fontSize: 24,
-    fontWeight: '800',
-    letterSpacing: -0.5,
+    fontSize: 29,
+    fontWeight: '900',
+    letterSpacing: -1,
+    marginTop: 3,
   },
   gymSubTitle: {
-    fontSize: 15,
-    fontWeight: '700',
-    marginTop: 2,
+    fontSize: 13,
+    fontWeight: '600',
+    marginTop: 3,
   },
   dateText: {
-    fontSize: 13,
-    fontWeight: '500',
-    marginTop: 4,
+    fontSize: 10,
+    fontWeight: '800',
+    letterSpacing: 1.25,
   },
   settingsButton: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
+    width: 46,
+    height: 46,
+    borderRadius: 15,
     borderWidth: 1,
     alignItems: 'center',
     justifyContent: 'center',
@@ -975,6 +976,65 @@ const styles = StyleSheet.create({
     marginTop: 12,
     fontSize: 14,
   },
+  revenueHero: {
+    minHeight: 132,
+    borderRadius: 22,
+    padding: 16,
+    marginBottom: 14,
+    overflow: 'hidden',
+    borderWidth: 1,
+  },
+  revenueHeroTop: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  revenueEyebrow: {
+    fontSize: 10,
+    fontWeight: '900',
+    letterSpacing: 1.35,
+  },
+  revenueValue: {
+    fontSize: 34,
+    lineHeight: 39,
+    fontWeight: '900',
+    letterSpacing: -1.5,
+    marginTop: 7,
+  },
+  revenueFooter: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: 5,
+  },
+  revenueCaption: { fontSize: 12, fontWeight: '600' },
+  revenueLinkRow: { flexDirection: 'row', alignItems: 'center', gap: 5 },
+  revenueLink: { fontSize: 12, fontWeight: '800' },
+  metricsPanel: {
+    flexDirection: 'row',
+    alignItems: 'stretch',
+    borderWidth: 1,
+    borderRadius: 20,
+    paddingVertical: 16,
+    marginBottom: 28,
+  },
+  metricItem: {
+    flex: 1,
+    paddingHorizontal: 10,
+  },
+  metricValue: {
+    fontSize: 25,
+    fontWeight: '900',
+    letterSpacing: -0.8,
+    marginBottom: 6,
+  },
+  metricLabel: {
+    fontSize: 9,
+    lineHeight: 13,
+    fontWeight: '800',
+    letterSpacing: 0.65,
+  },
+  metricDivider: { width: 1 },
   statsSection: {
     marginBottom: 24,
   },
@@ -993,9 +1053,15 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   sectionTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    letterSpacing: -0.3,
+    fontSize: 22,
+    fontWeight: '800',
+    letterSpacing: -0.55,
+  },
+  sectionEyebrow: {
+    fontSize: 10,
+    fontWeight: '900',
+    letterSpacing: 1.2,
+    marginBottom: 3,
   },
   titleWithBadge: {
     flexDirection: 'row',
@@ -1007,11 +1073,51 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   quickActionsContainer: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 10,
-    marginBottom: 24,
+    borderTopWidth: 1,
+    borderBottomWidth: 1,
+    marginBottom: 16,
   },
+  primaryAction: {
+    minHeight: 68,
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  actionNumber: {
+    width: 38,
+    fontSize: 10,
+    fontWeight: '900',
+    letterSpacing: 1,
+  },
+  actionDivider: { height: 1, marginLeft: 38 },
+  primaryActionCopy: { flex: 1 },
+  primaryActionTitle: { fontSize: 16, fontWeight: '800' },
+  primaryActionSubtitle: { fontSize: 11, fontWeight: '500', marginTop: 3 },
+  toolsPanel: {
+    borderRadius: 20,
+    borderWidth: 1,
+    paddingHorizontal: 13,
+    marginBottom: 28,
+    overflow: 'hidden',
+  },
+  toolRow: {
+    minHeight: 68,
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  toolMarker: { width: 6, height: 6, borderRadius: 3 },
+  toolCopy: { flex: 1, marginLeft: 13 },
+  toolTitle: { fontSize: 14, fontWeight: '700' },
+  toolSubtitle: { fontSize: 11, marginTop: 2 },
+  toolDivider: { height: 1, marginLeft: 19 },
+  countBadge: {
+    minWidth: 24,
+    height: 24,
+    borderRadius: 12,
+    paddingHorizontal: 7,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  countBadgeText: { color: '#FFFFFF', fontSize: 11, fontWeight: '800' },
   quickActionButton: {
     width: '48%',
     flexGrow: 1,
@@ -1057,7 +1163,7 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   attendanceSection: {
-    marginBottom: 20,
+    marginBottom: 10,
   },
   attendanceCard: {
     borderRadius: 16,

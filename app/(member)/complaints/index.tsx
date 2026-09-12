@@ -151,13 +151,20 @@ export default function MemberComplaintsListScreen() {
           />
         }
         ListHeaderComponent={
-          <View style={styles.header}>
-            <Text style={[styles.headerTitle, { color: colors.text }]}>
-              My Complaints & Feedback
-            </Text>
-            <Text style={[styles.headerSubtitle, { color: colors.textSecondary }]}>
-              Submit issues, equipment repairs, or feedback directly to management
-            </Text>
+          <View style={styles.headerRow}>
+            <TouchableOpacity
+              style={[styles.backButton, { backgroundColor: colors.surface, borderColor: colors.border }]}
+              onPress={() => router.back()}
+              activeOpacity={0.7}
+            >
+              <Ionicons name="arrow-back" size={20} color={colors.text} />
+            </TouchableOpacity>
+            <View style={styles.header}>
+              <Text style={[styles.headerTitle, { color: colors.text }]}>Feedback</Text>
+              <Text style={[styles.headerSubtitle, { color: colors.textSecondary }]}>
+                Your reports and replies from the gym
+              </Text>
+            </View>
           </View>
         }
         ListEmptyComponent={
@@ -206,9 +213,17 @@ const styles = StyleSheet.create({
   listContent: {
     paddingHorizontal: 16,
   },
-  header: {
-    marginBottom: 18,
+  headerRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 18 },
+  backButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12,
   },
+  header: { flex: 1 },
   headerTitle: {
     fontSize: 24,
     fontWeight: '800',

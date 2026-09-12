@@ -7,10 +7,11 @@ import {
   TouchableOpacity,
   KeyboardAvoidingView,
   Platform,
+  Keyboard,
   ActivityIndicator,
   StyleSheet,
 } from 'react-native';
-import { useRouter, useFocusEffect } from 'expo-router';
+import { useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useAppAuth } from '../../lib/auth';
 import { useTheme } from '../../lib/theme';
@@ -20,14 +21,26 @@ import { messageGrouping } from '../../utils/chat-grouping';
 import { formatDateTime } from '../../utils/date';
 
 export default function OwnerStaffChatScreen() {
-  const router = useRouter();
   const { profile } = useAppAuth();
   const { colors, isDark } = useTheme();
   const { messages, loading, sendMessage, markAsRead } = useStaffChat();
 
   const [inputText, setInputText] = useState('');
   const [isSending, setIsSending] = useState(false);
+  const [keyboardVisible, setKeyboardVisible] = useState(false);
   const flatListRef = useRef<FlatList>(null);
+
+  // The owner tab bar floats over screen content. Lift the composer above it,
+  // then remove that space when Android/iOS replaces the tab bar with the
+  // keyboard so the text field still sits directly above the keys.
+  useEffect(() => {
+    const show = Keyboard.addListener('keyboardDidShow', () => setKeyboardVisible(true));
+    const hide = Keyboard.addListener('keyboardDidHide', () => setKeyboardVisible(false));
+    return () => {
+      show.remove();
+      hide.remove();
+    };
+  }, []);
 
   // Mark unread messages on view
   useEffect(() => {
@@ -226,22 +239,14 @@ export default function OwnerStaffChatScreen() {
     >
       {/* Header */}
       <View style={[styles.header, { borderBottomColor: colors.border, backgroundColor: colors.surface }]}>
-        <TouchableOpacity
-          style={[styles.backButton, { backgroundColor: colors.surfaceElevated, borderColor: colors.border }]}
-          onPress={() => router.back()}
-          activeOpacity={0.7}
-        >
-          <Ionicons name="arrow-back" size={20} color={colors.text} />
-        </TouchableOpacity>
-
         <View style={styles.headerInfo}>
           <Text style={[styles.headerTitle, { color: colors.text }]}>
-            Staff & Team Chat
+            Team chat
           </Text>
           <View style={styles.headerStatusRow}>
             <View style={[styles.onlineDot, { backgroundColor: colors.success }]} />
             <Text style={[styles.headerSubtitle, { color: colors.textSecondary }]}>
-              Gym Internal Channel
+              Private gym channel
             </Text>
           </View>
         </View>
@@ -278,7 +283,16 @@ export default function OwnerStaffChatScreen() {
       )}
 
       {/* Message Input Bar */}
-      <View style={[styles.inputBar, { backgroundColor: colors.surface, borderTopColor: colors.border }]}>
+      <View
+        style={[
+          styles.inputBar,
+          {
+            backgroundColor: colors.surface,
+            borderTopColor: colors.border,
+            marginBottom: keyboardVisible ? 0 : 82,
+          },
+        ]}
+      >
         <TextInput
           style={[
             styles.textInput,
@@ -336,21 +350,13 @@ const styles = StyleSheet.create({
     paddingBottom: 14,
     borderBottomWidth: 1,
   },
-  backButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    borderWidth: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 12,
-  },
   headerInfo: {
     flex: 1,
   },
   headerTitle: {
-    fontSize: 18,
-    fontWeight: '700',
+    fontSize: 25,
+    fontWeight: '900',
+    letterSpacing: -0.7,
   },
   headerStatusRow: {
     flexDirection: 'row',
@@ -421,6 +427,7 @@ const styles = StyleSheet.create({
   },
   otherMessageWrapper: {
     flex: 1,
+    alignItems: 'flex-start',
   },
   otherSenderName: {
     fontSize: 12,
@@ -437,6 +444,7 @@ const styles = StyleSheet.create({
     borderRadius: 18,
     borderBottomLeftRadius: 4,
     borderWidth: 1,
+    alignSelf: 'flex-start',
   },
   otherMessageText: {
     fontSize: 15,

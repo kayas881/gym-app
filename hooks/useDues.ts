@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useFocusEffect } from 'expo-router';
 import { useSupabase } from './useSupabase';
 import { useAppAuth } from '../lib/auth';
 import { today } from '../utils/date';
@@ -115,6 +116,17 @@ export function useDues() {
   useEffect(() => {
     fetchDues();
   }, [fetchDues]);
+
+  // DuesBanner lives on a mounted tab (dashboard, payments). Without this, an
+  // owner who collects a balance on the Dues screen and taps back still sees
+  // the banner's stale pre-collection amount, because that instance of this
+  // hook was never told to look again -- same failure the dashboard's own
+  // stats hit before it grew the matching useFocusEffect.
+  useFocusEffect(
+    useCallback(() => {
+      fetchDues();
+    }, [fetchDues])
+  );
 
   /** Take some or all of what is owed on one subscription. */
   const collectBalance = useCallback(

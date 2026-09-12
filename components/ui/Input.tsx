@@ -177,11 +177,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     borderWidth: 1,
-    borderRadius: 12,
+    borderRadius: 15,
     paddingHorizontal: 14,
   },
   singleLineContainer: {
-    height: 48,
+    height: 52,
   },
   multilineContainer: {
     minHeight: 80,

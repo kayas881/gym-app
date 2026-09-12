@@ -11,6 +11,7 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useRouter } from 'expo-router';
 import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -18,12 +19,13 @@ import { useAppAuth } from '../../lib/auth';
 import { useTheme } from '../../lib/theme';
 import { useSubscriptions } from '../../hooks/useSubscriptions';
 import { formatDate, today } from '../../utils/date';
-import { generateReceiptHTML } from '../../utils/receipt-template';
+import { generateReceiptHTML, RECEIPT_PDF_OPTIONS } from '../../utils/receipt-template';
 import Card from '../../components/ui/Card';
 import Badge from '../../components/ui/Badge';
 import Button from '../../components/ui/Button';
 
 export default function MemberPaymentsScreen() {
+  const router = useRouter();
   const insets = useSafeAreaInsets();
   const { profile, currentMembership } = useAppAuth();
   const { colors, isDark } = useTheme();
@@ -65,7 +67,7 @@ export default function MemberPaymentsScreen() {
         paymentDate: item.created_at || item.start_date,
       });
 
-      const { uri } = await Print.printToFileAsync({ html });
+      const { uri } = await Print.printToFileAsync({ html, ...RECEIPT_PDF_OPTIONS });
 
       if (await Sharing.isAvailableAsync()) {
         await Sharing.shareAsync(uri, {
@@ -191,13 +193,20 @@ export default function MemberPaymentsScreen() {
           />
         }
         ListHeaderComponent={
-          <View style={styles.header}>
-            <Text style={[styles.headerTitle, { color: colors.text }]}>
-              Payment History
-            </Text>
-            <Text style={[styles.headerSubtitle, { color: colors.textSecondary }]}>
-              Receipts, subscription renewals, and transaction records
-            </Text>
+          <View style={styles.headerRow}>
+            <TouchableOpacity
+              style={[styles.backButton, { backgroundColor: colors.surface, borderColor: colors.border }]}
+              onPress={() => router.back()}
+              activeOpacity={0.7}
+            >
+              <Ionicons name="arrow-back" size={20} color={colors.text} />
+            </TouchableOpacity>
+            <View style={styles.header}>
+              <Text style={[styles.headerTitle, { color: colors.text }]}>Payment History</Text>
+              <Text style={[styles.headerSubtitle, { color: colors.textSecondary }]}>
+                Plans, payments and receipts
+              </Text>
+            </View>
           </View>
         }
         ListEmptyComponent={
@@ -378,9 +387,17 @@ const styles = StyleSheet.create({
   listContent: {
     paddingHorizontal: 16,
   },
-  header: {
-    marginBottom: 18,
+  headerRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 18 },
+  backButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12,
   },
+  header: { flex: 1 },
   headerTitle: {
     fontSize: 24,
     fontWeight: '800',

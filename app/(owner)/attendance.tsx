@@ -93,10 +93,10 @@ export default function OwnerTodayAttendanceScreen() {
         <View
           style={[
             styles.emptyIconCircle,
-            { backgroundColor: isDark ? 'rgba(0, 230, 118, 0.12)' : 'rgba(0, 200, 83, 0.08)' },
+            { backgroundColor: colors.primaryMuted },
           ]}
         >
-          <Ionicons name="finger-print-outline" size={56} color={colors.primary} />
+          <Ionicons name="finger-print-outline" size={40} color={colors.primary} />
         </View>
         <Text style={[styles.emptyTitle, { color: colors.text }]}>
           {searchQuery ? 'No Matching Check-ins' : 'No Check-ins Yet Today'}
@@ -104,7 +104,7 @@ export default function OwnerTodayAttendanceScreen() {
         <Text style={[styles.emptySubtitle, { color: colors.textSecondary }]}>
           {searchQuery
             ? `No members with name matching "${searchQuery}" checked in today.`
-            : 'As members scan QR or check in upon arrival at the gym, their timestamps will appear here in real time.'}
+            : 'Member scans appear here. Pull down to refresh after someone checks in.'}
         </Text>
       </View>
     );
@@ -114,29 +114,16 @@ export default function OwnerTodayAttendanceScreen() {
     <View style={[styles.screen, { backgroundColor: colors.background }]}>
       {/* Header */}
       <View style={styles.header}>
-        <TouchableOpacity
-          style={[styles.backButton, { backgroundColor: colors.surface, borderColor: colors.border }]}
-          onPress={() => router.back()}
-          activeOpacity={0.7}
-        >
-          <Ionicons name="arrow-back" size={20} color={colors.text} />
-        </TouchableOpacity>
-
         <View style={styles.headerTitleGroup}>
           <Text style={[styles.headerTitle, { color: colors.text }]}>
             Today's Attendance
           </Text>
           <Text style={[styles.headerDate, { color: colors.textSecondary }]}>
-            {todayFormatted}
+            {todayFormatted} · {records.length} {records.length === 1 ? 'check-in' : 'check-ins'}
           </Text>
         </View>
 
         <View style={styles.headerActions}>
-          <Badge
-            text={`${records.length} ${records.length === 1 ? 'Check-in' : 'Check-ins'}`}
-            variant="success"
-            size="md"
-          />
           <TouchableOpacity
             onPress={() => router.push('/(owner)/qr-code')}
             activeOpacity={0.8}
@@ -146,7 +133,8 @@ export default function OwnerTodayAttendanceScreen() {
               { backgroundColor: colors.primaryMuted, borderColor: colors.primary },
             ]}
           >
-            <Ionicons name="qr-code-outline" size={20} color={colors.primary} />
+            <Ionicons name="qr-code-outline" size={18} color={colors.primary} />
+            <Text style={[styles.qrButtonText, { color: colors.primary }]}>Gym QR</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -285,22 +273,16 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   qrButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 12,
-    borderWidth: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  backButton: {
-    width: 40,
     height: 40,
     borderRadius: 20,
     borderWidth: 1,
-    alignItems: 'center',
+    paddingHorizontal: 12,
+    flexDirection: 'row',
+    gap: 6,
     justifyContent: 'center',
-    marginRight: 12,
+    alignItems: 'center',
   },
+  qrButtonText: { fontSize: 12, fontWeight: '800' },
   blindSpotNote: {
     flexDirection: 'row',
     alignItems: 'flex-start',
@@ -317,9 +299,9 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   headerTitle: {
-    fontSize: 20,
-    fontWeight: '700',
-    letterSpacing: -0.3,
+    fontSize: 25,
+    fontWeight: '900',
+    letterSpacing: -0.7,
   },
   headerDate: {
     fontSize: 12,
@@ -335,7 +317,7 @@ const styles = StyleSheet.create({
   },
   listContent: {
     paddingHorizontal: 16,
-    paddingBottom: 40,
+    paddingBottom: 108,
   },
   loadingContainer: {
     flex: 1,
@@ -350,13 +332,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: 32,
-    paddingTop: 80,
+    paddingTop: 64,
     gap: 12,
   },
   emptyIconCircle: {
-    width: 96,
-    height: 96,
-    borderRadius: 48,
+    width: 76,
+    height: 76,
+    borderRadius: 24,
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 4,

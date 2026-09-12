@@ -18,7 +18,6 @@ import { useTheme } from '../../lib/theme';
 import { useSubscriptions } from '../../hooks/useSubscriptions';
 import { daysRemaining, formatDate, isExpired } from '../../utils/date';
 import Card from '../../components/ui/Card';
-import Badge from '../../components/ui/Badge';
 import Button from '../../components/ui/Button';
 import { useToday } from '../../hooks/useToday';
 
@@ -198,7 +197,7 @@ export default function RenewMembershipScreen() {
           </View>
         </View>
 
-        {/* Current Plan Status Banner */}
+        {/* Compact coverage context keeps the plans—not a status banner—as the focus. */}
         <Card
           style={[
             styles.statusCard,
@@ -212,16 +211,15 @@ export default function RenewMembershipScreen() {
                   backgroundColor: isDark ? 'rgba(0, 230, 118, 0.08)' : '#E8F8F0',
                 },
           ]}
-          padding={16}
+          padding={14}
         >
           <View style={styles.statusRow}>
-            <View style={styles.statusIconWrap}>
-              <Ionicons
-                name={expired ? 'alert-circle' : 'time'}
-                size={28}
-                color={expired ? colors.error : colors.primary}
-              />
-            </View>
+            <View
+              style={[
+                styles.statusMarker,
+                { backgroundColor: expired ? colors.error : colors.primary },
+              ]}
+            />
             <View style={styles.statusInfo}>
               <Text
                 style={[
@@ -229,20 +227,20 @@ export default function RenewMembershipScreen() {
                   { color: expired ? colors.error : colors.primary },
                 ]}
               >
-                {expired ? 'Membership Expired' : `${daysLeft} Days Remaining`}
+                {expired
+                  ? 'Membership expired'
+                  : awaitingFirstPlan
+                  ? 'Ready for your first plan'
+                  : `${daysLeft} days of access left`}
               </Text>
               <Text style={[styles.statusSubtitle, { color: colors.textSecondary }]}>
-                {activeSubscription
-                  ? upcomingSubscription
-                    ? `Current: ${activeSubscription.plan?.name || 'Active'} to ${formatDate(
-                        activeSubscription.end_date
-                      )}, then ${upcomingSubscription.plan?.name || 'renewal'} to ${formatDate(
-                        upcomingSubscription.end_date
-                      )}`
-                    : `Current plan: ${activeSubscription.plan?.name || 'Active'} (Ends ${formatDate(
-                        activeSubscription.end_date
-                      )})`
-                  : 'No active plan found. Select a plan below.'}
+                {coverageEnd
+                  ? `Covered through ${formatDate(coverageEnd)}${
+                      upcomingSubscription
+                        ? ` · includes ${upcomingSubscription.plan?.name || 'upcoming renewal'}`
+                        : ''
+                    }`
+                  : 'Choose a plan below and notify the gym desk.'}
               </Text>
             </View>
           </View>
@@ -254,7 +252,7 @@ export default function RenewMembershipScreen() {
             Available Plans
           </Text>
           <Text style={[styles.sectionSubtitle, { color: colors.textSecondary }]}>
-            Select a subscription plan for {gymName}
+            Compare term and price for {gymName}
           </Text>
         </View>
 
@@ -288,6 +286,7 @@ export default function RenewMembershipScreen() {
             return (
               <Card
                 key={plan.id}
+                onPress={() => handleSelectPlan(plan)}
                 style={[
                   styles.planCard,
                   isCurrent && {
@@ -295,16 +294,20 @@ export default function RenewMembershipScreen() {
                     borderWidth: 1.5,
                   },
                 ]}
-                padding={20}
+                padding={0}
               >
-                <View style={styles.planCardHeader}>
+                <View style={styles.planRow}>
                   <View style={styles.planInfoWrap}>
-                    <View style={styles.planTitleBadgeRow}>
+                    <View style={styles.planTitleRow}>
                       <Text style={[styles.planName, { color: colors.text }]}>
                         {plan.name}
                       </Text>
                       {isCurrent && (
-                        <Badge text="CURRENT PLAN" variant="info" size="sm" />
+                        <View style={[styles.currentPill, { backgroundColor: colors.primaryMuted }]}>
+                          <Text style={[styles.currentPillText, { color: colors.primary }]}>
+                            CURRENT
+                          </Text>
+                        </View>
                       )}
                     </View>
                     <Text style={[styles.planDuration, { color: colors.textSecondary }]}>
@@ -312,39 +315,21 @@ export default function RenewMembershipScreen() {
                     </Text>
                   </View>
 
-                  <View style={styles.priceContainer}>
-                    <Text style={[styles.priceCurrency, { color: colors.primary }]}>₹</Text>
-                    <Text style={[styles.priceAmount, { color: colors.text }]}>
-                      {plan.price.toLocaleString('en-IN')}
+                  <View style={styles.planAction}>
+                    <View style={styles.priceContainer}>
+                      <Text style={[styles.priceCurrency, { color: colors.textSecondary }]}>₹</Text>
+                      <Text style={[styles.priceAmount, { color: colors.text }]}>
+                        {plan.price.toLocaleString('en-IN')}
+                      </Text>
+                    </View>
+                    <Text style={[styles.actionLabel, { color: colors.primary }]}>
+                      {isCurrent ? 'Renew' : 'Choose'}
                     </Text>
+                  </View>
+                  <View style={[styles.planChevron, { backgroundColor: colors.surfaceElevated }]}>
+                    <Ionicons name="chevron-forward" size={18} color={colors.primary} />
                   </View>
                 </View>
-
-                {/* Plan Highlights */}
-                <View style={styles.featuresList}>
-                  <View style={styles.featureItem}>
-                    <Ionicons name="checkmark-circle" size={16} color={colors.primary} />
-                    <Text style={[styles.featureText, { color: colors.textSecondary }]}>
-                      Full gym access during all operating hours
-                    </Text>
-                  </View>
-                  <View style={styles.featureItem}>
-                    <Ionicons name="checkmark-circle" size={16} color={colors.primary} />
-                    <Text style={[styles.featureText, { color: colors.textSecondary }]}>
-                      Valid for {durationLabel} from activation date
-                    </Text>
-                  </View>
-                </View>
-
-                {/* Action Button */}
-                <Button
-                  title={isCurrent ? 'Renew This Plan' : 'Select Plan'}
-                  onPress={() => handleSelectPlan(plan)}
-                  variant={isCurrent ? 'primary' : 'outline'}
-                  size="md"
-                  fullWidth
-                  style={styles.selectButton}
-                />
               </Card>
             );
           })
@@ -506,7 +491,10 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
   },
-  statusIconWrap: {
+  statusMarker: {
+    width: 4,
+    height: 36,
+    borderRadius: 2,
     marginRight: 12,
   },
   statusInfo: {
@@ -556,63 +544,71 @@ const styles = StyleSheet.create({
     lineHeight: 18,
   },
   planCard: {
-    marginBottom: 16,
+    marginBottom: 10,
   },
-  planCardHeader: {
+  planRow: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: 12,
+    alignItems: 'center',
+    minHeight: 82,
+    paddingHorizontal: 16,
+    paddingVertical: 13,
   },
   planInfoWrap: {
     flex: 1,
-    marginRight: 12,
+    marginRight: 10,
   },
-  planTitleBadgeRow: {
+  planTitleRow: {
     flexDirection: 'row',
     alignItems: 'center',
     flexWrap: 'wrap',
-    gap: 8,
-    marginBottom: 4,
+    gap: 7,
+    marginBottom: 3,
   },
   planName: {
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: '700',
   },
+  currentPill: {
+    borderRadius: 999,
+    paddingHorizontal: 7,
+    paddingVertical: 3,
+  },
+  currentPillText: {
+    fontSize: 9,
+    fontWeight: '800',
+    letterSpacing: 0.6,
+  },
   planDuration: {
-    fontSize: 13,
+    fontSize: 12,
+  },
+  planAction: {
+    alignItems: 'flex-end',
+    marginRight: 10,
   },
   priceContainer: {
     flexDirection: 'row',
     alignItems: 'baseline',
   },
   priceCurrency: {
-    fontSize: 16,
+    fontSize: 13,
     fontWeight: '700',
-    marginRight: 2,
+    marginRight: 1,
   },
   priceAmount: {
-    fontSize: 24,
+    fontSize: 20,
     fontWeight: '800',
   },
-  featuresList: {
-    gap: 8,
-    marginBottom: 16,
-    paddingTop: 12,
-    borderTopWidth: 1,
-    borderTopColor: 'rgba(150, 150, 150, 0.1)',
+  actionLabel: {
+    fontSize: 11,
+    fontWeight: '700',
+    marginTop: 2,
   },
-  featureItem: {
-    flexDirection: 'row',
+  planChevron: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
     alignItems: 'center',
-    gap: 8,
-  },
-  featureText: {
-    fontSize: 13,
-    flex: 1,
-  },
-  selectButton: {
-    marginTop: 4,
+    justifyContent: 'center',
   },
   modalOverlay: {
     flex: 1,

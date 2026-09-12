@@ -19,7 +19,6 @@ import { TIME_SLOTS } from '../../constants/config';
 import Avatar from '../../components/ui/Avatar';
 import Badge from '../../components/ui/Badge';
 import Card from '../../components/ui/Card';
-import StatCard from '../../components/StatCard';
 
 interface StaffAttendanceItem {
   id: string;
@@ -38,7 +37,7 @@ export default function StaffHomeScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { profile, gymId, currentMembership } = useAppAuth();
-  const { colors, isDark } = useTheme();
+  const { colors } = useTheme();
 
   const { fetchTodayAttendance } = useCheckIns();
 
@@ -148,7 +147,7 @@ export default function StaffHomeScreen() {
         renderItem={renderAttendanceItem}
         contentContainerStyle={[
           styles.listContent,
-          { paddingTop: Math.max(insets.top + 12, 44), paddingBottom: insets.bottom + 32 },
+          { paddingTop: Math.max(insets.top + 12, 44), paddingBottom: insets.bottom + 104 },
         ]}
         showsVerticalScrollIndicator={false}
         refreshControl={
@@ -161,17 +160,17 @@ export default function StaffHomeScreen() {
         }
         ListHeaderComponent={
           <View style={styles.header}>
-            {/* Greeting Header */}
+            {/* Shift header */}
             <View style={styles.greetingRow}>
               <View style={styles.greetingTextWrap}>
-                <Text style={[styles.greetingTitle, { color: colors.text }]}>
-                  Staff Portal 👋
+                <Text style={[styles.dateEyebrow, { color: colors.textSecondary }]}>
+                  {todayFormatted.toUpperCase()}
                 </Text>
-                <Text style={[styles.gymNameText, { color: colors.primary }]}>
+                <Text style={[styles.greetingTitle, { color: colors.text }]}>
                   {gymName}
                 </Text>
-                <Text style={[styles.dateText, { color: colors.textSecondary }]}>
-                  {todayFormatted}
+                <Text style={[styles.gymNameText, { color: colors.textSecondary }]}>
+                  Front desk · {staffName}
                 </Text>
               </View>
 
@@ -187,44 +186,46 @@ export default function StaffHomeScreen() {
               </TouchableOpacity>
             </View>
 
-            {/* Quick Stats Grid */}
-            <View style={styles.statsSection}>
-              <View style={styles.statsRow}>
-                <StatCard
-                  title="Total Today"
-                  value={attendanceList.length}
-                  subtitle="Member check-ins"
-                  icon="people-outline"
-                  color={colors.primary}
-                  style={styles.statHalf}
-                />
-                <StatCard
-                  title="Morning Slot"
-                  value={slotCounts.morning}
-                  subtitle={slotLabel('morning')}
-                  icon="sunny-outline"
-                  color={colors.warning}
-                  style={styles.statHalf}
-                />
+            {/* One attendance board is faster to scan than four repeated stat tiles. */}
+            <Card style={styles.attendanceBoard} padding={0}>
+              <View style={styles.attendanceBoardTop}>
+                <View>
+                  <Text style={[styles.boardEyebrow, { color: colors.primary }]}>
+                    TODAY'S FLOOR
+                  </Text>
+                  <View style={styles.totalRow}>
+                    <Text style={[styles.totalValue, { color: colors.text }]}>
+                      {attendanceList.length}
+                    </Text>
+                    <Text style={[styles.totalLabel, { color: colors.textSecondary }]}>
+                      {attendanceList.length === 1 ? 'member check-in' : 'member check-ins'}
+                    </Text>
+                  </View>
+                </View>
+                <View style={[styles.livePill, { backgroundColor: colors.primaryMuted }]}>
+                  <View style={[styles.liveDot, { backgroundColor: colors.primary }]} />
+                  <Text style={[styles.liveText, { color: colors.primary }]}>LIVE</Text>
+                </View>
               </View>
 
-              <View style={styles.statsRow}>
-                <StatCard
-                  title="Afternoon Slot"
-                  value={slotCounts.afternoon}
-                  subtitle={slotLabel('afternoon')}
-                  icon="partly-sunny-outline"
-                  color={colors.info}
-                  style={styles.statHalf}
-                />
-                <StatCard
-                  title="Evening Slot"
-                  value={slotCounts.evening}
-                  subtitle={slotLabel('evening')}
-                  icon="moon-outline"
-                  color={colors.statusActive}
-                  style={styles.statHalf}
-                />
+              <View style={[styles.slotStrip, { borderTopColor: colors.divider }]}>
+                {([
+                  ['Morning', slotCounts.morning, slotLabel('morning')],
+                  ['Afternoon', slotCounts.afternoon, slotLabel('afternoon')],
+                  ['Evening', slotCounts.evening, slotLabel('evening')],
+                ] as const).map(([label, count, hours], index) => (
+                  <View
+                    key={label}
+                    style={[
+                      styles.slotCell,
+                      index > 0 && { borderLeftColor: colors.divider, borderLeftWidth: 1 },
+                    ]}
+                  >
+                    <Text style={[styles.slotCount, { color: colors.text }]}>{count}</Text>
+                    <Text style={[styles.slotName, { color: colors.textSecondary }]}>{label}</Text>
+                    <Text style={[styles.slotHours, { color: colors.textTertiary }]}>{hours}</Text>
+                  </View>
+                ))}
               </View>
 
               {/* This gym closes at 22:00 but the slots stop at 21:00, so a
@@ -235,7 +236,7 @@ export default function StaffHomeScreen() {
                 <View
                   style={[
                     styles.outsideSlotRow,
-                    { backgroundColor: colors.surfaceElevated, borderColor: colors.border },
+                    { backgroundColor: colors.surfaceElevated, borderTopColor: colors.divider },
                   ]}
                 >
                   <Ionicons name="time-outline" size={16} color={colors.textSecondary} />
@@ -246,72 +247,48 @@ export default function StaffHomeScreen() {
                   </Text>
                 </View>
               ) : null}
+            </Card>
+
+            <View style={styles.toolsHeading}>
+              <Text style={[styles.toolsEyebrow, { color: colors.primary }]}>FRONT DESK</Text>
+              <Text style={[styles.toolsTitle, { color: colors.text }]}>Tools for the shift</Text>
             </View>
 
-            {/* Quick Actions for Staff */}
-            <View style={styles.quickNavRow}>
-              <TouchableOpacity
-                style={[
-                  styles.quickNavBtn,
-                  { backgroundColor: colors.surface, borderColor: colors.border },
-                ]}
-                onPress={() => router.push('/(staff)/qr-code')}
-                activeOpacity={0.7}
-              >
-                <Ionicons name="qr-code" size={20} color={colors.success} />
-                <Text style={[styles.quickNavText, { color: colors.text }]}>Check-In Code</Text>
-              </TouchableOpacity>
-
-              {/* Staff are the ones at the desk when the owner is not, so they
-                  need to be able to hand out the join code themselves. */}
-              <TouchableOpacity
-                style={[
-                  styles.quickNavBtn,
-                  { backgroundColor: colors.surface, borderColor: colors.border },
-                ]}
-                onPress={() => router.push('/(staff)/invite')}
-                activeOpacity={0.7}
-              >
-                <Ionicons name="person-add" size={20} color={colors.warning} />
-                <Text style={[styles.quickNavText, { color: colors.text }]}>Invite Members</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={[
-                  styles.quickNavBtn,
-                  { backgroundColor: colors.surface, borderColor: colors.border },
-                ]}
-                onPress={() => router.push('/(staff)/members')}
-                activeOpacity={0.7}
-              >
-                <Ionicons name="people" size={20} color={colors.primary} />
-                <Text style={[styles.quickNavText, { color: colors.text }]}>View Members</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={[
-                  styles.quickNavBtn,
-                  { backgroundColor: colors.surface, borderColor: colors.border },
-                ]}
-                onPress={() => router.push('/(staff)/announcements')}
-                activeOpacity={0.7}
-              >
-                <Ionicons name="megaphone" size={20} color={colors.info} />
-                <Text style={[styles.quickNavText, { color: colors.text }]}>Announcements</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={[
-                  styles.quickNavBtn,
-                  { backgroundColor: colors.surface, borderColor: colors.border },
-                ]}
-                onPress={() => router.push('/(staff)/staff-chat')}
-                activeOpacity={0.7}
-              >
-                <Ionicons name="chatbubbles" size={20} color={colors.warning} />
-                <Text style={[styles.quickNavText, { color: colors.text }]}>Team Chat</Text>
-              </TouchableOpacity>
-            </View>
+            <Card style={styles.deskToolsCard} padding={0}>
+              {([
+                ['01', 'Display check-in code', 'Members scan it from their app', '/(staff)/qr-code'],
+                ['02', 'Invite a member', 'Share the gym joining code', '/(staff)/invite'],
+                ['03', 'Member directory', 'Look up status and details', '/(staff)/members'],
+                ['04', 'Post an update', 'Notify members or the team', '/(staff)/announcements'],
+                ['05', 'Team chat', 'Coordinate with the owner', '/(staff)/staff-chat'],
+              ] as const).map(([number, title, subtitle, route], index) => (
+                <TouchableOpacity
+                  key={number}
+                  style={[
+                    styles.deskToolRow,
+                    index > 0 && { borderTopColor: colors.divider, borderTopWidth: 1 },
+                  ]}
+                  onPress={() => router.push(route)}
+                  activeOpacity={0.7}
+                >
+                  <Text
+                    style={[
+                      styles.deskToolNumber,
+                      { color: index < 2 ? colors.primary : colors.textTertiary },
+                    ]}
+                  >
+                    {number}
+                  </Text>
+                  <View style={styles.deskToolCopy}>
+                    <Text style={[styles.deskToolTitle, { color: colors.text }]}>{title}</Text>
+                    <Text style={[styles.deskToolSubtitle, { color: colors.textSecondary }]}>
+                      {subtitle}
+                    </Text>
+                  </View>
+                  <Ionicons name="arrow-forward" size={20} color={colors.textTertiary} />
+                </TouchableOpacity>
+              ))}
+            </Card>
 
             {/* Attendance List Title */}
             <View style={styles.listTitleRow}>
@@ -360,11 +337,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    borderWidth: 1,
-    borderRadius: 12,
-    paddingHorizontal: 12,
+    borderTopWidth: 1,
+    paddingHorizontal: 16,
     paddingVertical: 10,
-    marginTop: 4,
   },
   outsideSlotText: { flex: 1, fontSize: 12, lineHeight: 17 },
   container: {
@@ -387,18 +362,20 @@ const styles = StyleSheet.create({
     marginRight: 12,
   },
   greetingTitle: {
-    fontSize: 24,
+    fontSize: 32,
     fontWeight: '800',
-    letterSpacing: -0.4,
+    letterSpacing: -0.8,
+  },
+  dateEyebrow: {
+    fontSize: 11,
+    fontWeight: '800',
+    letterSpacing: 1.5,
+    marginBottom: 5,
   },
   gymNameText: {
-    fontSize: 15,
-    fontWeight: '700',
-    marginTop: 2,
-  },
-  dateText: {
-    fontSize: 13,
-    marginTop: 4,
+    fontSize: 14,
+    fontWeight: '600',
+    marginTop: 3,
   },
   chatHeaderButton: {
     width: 44,
@@ -408,41 +385,84 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  statsSection: {
-    marginBottom: 16,
+  attendanceBoard: {
+    marginBottom: 26,
   },
-  statsRow: {
+  attendanceBoardTop: {
     flexDirection: 'row',
-    gap: 12,
-    marginBottom: 12,
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+    paddingHorizontal: 18,
+    paddingTop: 17,
+    paddingBottom: 15,
   },
-  statHalf: {
-    flex: 1,
+  boardEyebrow: {
+    fontSize: 11,
+    fontWeight: '800',
+    letterSpacing: 1.2,
+    marginBottom: 4,
   },
-  quickNavRow: {
+  totalRow: {
     flexDirection: 'row',
-    // Wraps to a 2x2 grid. Four of these side by side on a phone squeezed the
-    // labels hard enough to break "Announcements" across lines mid-word.
-    flexWrap: 'wrap',
-    gap: 10,
-    marginBottom: 24,
+    alignItems: 'baseline',
+    gap: 8,
   },
-  quickNavBtn: {
-    // ~half the row minus the gap, so two fit per line.
-    flexBasis: '47%',
-    flexGrow: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-    paddingVertical: 14,
-    borderRadius: 12,
-    borderWidth: 1,
+  totalValue: {
+    fontSize: 42,
+    fontWeight: '800',
+    letterSpacing: -1.2,
   },
-  quickNavText: {
-    fontSize: 12,
+  totalLabel: {
+    fontSize: 13,
     fontWeight: '600',
   },
+  livePill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    borderRadius: 999,
+    paddingHorizontal: 9,
+    paddingVertical: 6,
+  },
+  liveDot: { width: 6, height: 6, borderRadius: 3 },
+  liveText: { fontSize: 10, fontWeight: '800', letterSpacing: 0.8 },
+  slotStrip: {
+    flexDirection: 'row',
+    borderTopWidth: 1,
+  },
+  slotCell: {
+    flex: 1,
+    paddingHorizontal: 10,
+    paddingVertical: 12,
+  },
+  slotCount: { fontSize: 21, fontWeight: '800' },
+  slotName: { fontSize: 11, fontWeight: '700', marginTop: 1 },
+  slotHours: { fontSize: 9, marginTop: 2 },
+  toolsHeading: { marginBottom: 11 },
+  toolsEyebrow: {
+    fontSize: 11,
+    fontWeight: '800',
+    letterSpacing: 1.3,
+    marginBottom: 3,
+  },
+  toolsTitle: { fontSize: 21, fontWeight: '800', letterSpacing: -0.4 },
+  deskToolsCard: { marginBottom: 26 },
+  deskToolRow: {
+    minHeight: 76,
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+  },
+  deskToolNumber: {
+    fontSize: 12,
+    fontWeight: '800',
+    letterSpacing: 0.8,
+    width: 38,
+  },
+  deskToolCopy: { flex: 1, marginRight: 10 },
+  deskToolTitle: { fontSize: 15, fontWeight: '700' },
+  deskToolSubtitle: { fontSize: 12, marginTop: 2 },
   listTitleRow: {
     flexDirection: 'row',
     alignItems: 'center',

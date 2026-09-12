@@ -13,7 +13,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAppAuth } from '../../lib/auth';
 import { useTheme } from '../../lib/theme';
 import { useCheckIns } from '../../hooks/useCheckIns';
-import { formatDate, formatDateTime, timeAgo, today } from '../../utils/date';
+import { formatDate, timeAgo, today, localDateOf } from '../../utils/date';
 import Card from '../../components/ui/Card';
 import Badge from '../../components/ui/Badge';
 
@@ -47,7 +47,7 @@ export default function AttendanceScreen() {
   const checkInDatesSet = useMemo(() => {
     const set = new Set<string>();
     checkIns.forEach((c) => {
-      set.add(c.checked_in_at.split('T')[0]);
+      set.add(localDateOf(c.checked_in_at));
     });
     return set;
   }, [checkIns]);
@@ -56,7 +56,7 @@ export default function AttendanceScreen() {
   const checkInsByDate = useMemo(() => {
     const map = new Map<string, typeof checkIns>();
     checkIns.forEach((c) => {
-      const dStr = c.checked_in_at.split('T')[0];
+      const dStr = localDateOf(c.checked_in_at);
       const existing = map.get(dStr) || [];
       existing.push(c);
       map.set(dStr, existing);
@@ -150,7 +150,7 @@ export default function AttendanceScreen() {
       <ScrollView
         contentContainerStyle={[
           styles.scrollContent,
-          { paddingTop: Math.max(insets.top + 12, 44), paddingBottom: insets.bottom + 32 },
+          { paddingTop: Math.max(insets.top + 12, 44), paddingBottom: insets.bottom + 106 },
         ]}
         showsVerticalScrollIndicator={false}
         refreshControl={
@@ -182,9 +182,12 @@ export default function AttendanceScreen() {
               <Ionicons name="chevron-back" size={18} color={colors.text} />
             </TouchableOpacity>
 
-            <Text style={[styles.monthTitle, { color: colors.text }]}>
-              {monthName}
-            </Text>
+            <View style={styles.monthTitleGroup}>
+              <Text style={[styles.monthTitle, { color: colors.text }]}>{monthName}</Text>
+              <Text style={[styles.monthCount, { color: colors.primary }]}>
+                {monthCheckInCount} {monthCheckInCount === 1 ? 'visit' : 'visits'}
+              </Text>
+            </View>
 
             <TouchableOpacity
               onPress={handleNextMonth}
@@ -277,30 +280,6 @@ export default function AttendanceScreen() {
           </View>
         </Card>
 
-        {/* Monthly Summary Stat */}
-        <View
-          style={[
-            styles.summaryCard,
-            { backgroundColor: colors.surfaceElevated, borderColor: colors.border },
-          ]}
-        >
-          <View style={[styles.summaryIconWrap, { backgroundColor: colors.primaryMuted }]}>
-            <Ionicons name="checkmark-done" size={24} color={colors.primary} />
-          </View>
-          <View style={styles.summaryTextWrap}>
-            <Text style={[styles.summaryTitle, { color: colors.text }]}>
-              {monthCheckInCount} Check-ins in {currentMonthDate.toLocaleDateString('en-IN', { month: 'short' })}
-            </Text>
-            <Text style={[styles.summarySubtitle, { color: colors.textSecondary }]}>
-              {monthCheckInCount >= 20
-                ? '🌟 Outstanding dedication!'
-                : monthCheckInCount >= 12
-                ? '💪 Great progress this month!'
-                : 'Keep pushing and stay consistent!'}
-            </Text>
-          </View>
-        </View>
-
         {/* Recent Check-Ins List Header */}
         <View style={styles.listHeaderRow}>
           <Text style={[styles.listTitle, { color: colors.text }]}>
@@ -321,8 +300,7 @@ export default function AttendanceScreen() {
             <ActivityIndicator size="small" color={colors.primary} />
           </View>
         ) : displayedCheckIns.length === 0 ? (
-          <Card style={styles.emptyCard} padding={24}>
-            <Ionicons name="calendar-outline" size={36} color={colors.textTertiary} />
+          <Card style={styles.emptyCard} padding={18}>
             <Text style={[styles.emptyTitle, { color: colors.text }]}>
               No check-ins found
             </Text>
@@ -415,6 +393,8 @@ const styles = StyleSheet.create({
     fontSize: 17,
     fontWeight: '700',
   },
+  monthTitleGroup: { alignItems: 'center' },
+  monthCount: { fontSize: 10, fontWeight: '800', letterSpacing: 0.7, marginTop: 2 },
   daysOfWeekRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -437,7 +417,7 @@ const styles = StyleSheet.create({
   },
   cell: {
     width: `${100 / 7}%`,
-    height: 42,
+    height: 38,
     alignItems: 'center',
     justifyContent: 'center',
     borderRadius: 8,
@@ -484,33 +464,6 @@ const styles = StyleSheet.create({
   legendText: {
     fontSize: 12,
   },
-  summaryCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderRadius: 14,
-    borderWidth: 1,
-    padding: 16,
-    marginBottom: 20,
-  },
-  summaryIconWrap: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 14,
-  },
-  summaryTextWrap: {
-    flex: 1,
-  },
-  summaryTitle: {
-    fontSize: 15,
-    fontWeight: '700',
-    marginBottom: 2,
-  },
-  summarySubtitle: {
-    fontSize: 13,
-  },
   listHeaderRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -532,7 +485,7 @@ const styles = StyleSheet.create({
   emptyCard: {
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 8,
+    gap: 5,
     marginBottom: 16,
   },
   emptyTitle: {

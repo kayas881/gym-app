@@ -6,10 +6,11 @@ import {
   TextInput,
   TouchableOpacity,
   KeyboardAvoidingView,
+  Keyboard,
   StyleSheet,
   ActivityIndicator,
 } from 'react-native';
-import { useRouter, useFocusEffect } from 'expo-router';
+import { useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAppAuth } from '../../lib/auth';
@@ -19,9 +20,8 @@ import Avatar from '../../components/ui/Avatar';
 import { messageGrouping } from '../../utils/chat-grouping';
 
 export default function StaffChatScreen() {
-  const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { profile, gymId, currentMembership } = useAppAuth();
+  const { profile, currentMembership } = useAppAuth();
   const { colors, isDark } = useTheme();
 
   const {
@@ -33,7 +33,19 @@ export default function StaffChatScreen() {
 
   const [inputText, setInputText] = useState('');
   const [isSending, setIsSending] = useState(false);
+  const [keyboardVisible, setKeyboardVisible] = useState(false);
   const flatListRef = useRef<FlatList>(null);
+
+  // Keep the composer above the floating tab bar, but reclaim that space when
+  // the keyboard replaces it.
+  useEffect(() => {
+    const show = Keyboard.addListener('keyboardDidShow', () => setKeyboardVisible(true));
+    const hide = Keyboard.addListener('keyboardDidHide', () => setKeyboardVisible(false));
+    return () => {
+      show.remove();
+      hide.remove();
+    };
+  }, []);
 
   // Mark unread messages on view. The owner screen did this; the staff screen
   // did not, so a staff member's unread count never cleared.
@@ -195,27 +207,15 @@ export default function StaffChatScreen() {
           },
         ]}
       >
-        <TouchableOpacity
-          onPress={() => router.back()}
-          style={[styles.backButton, { borderColor: colors.border }]}
-          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-        >
-          <Ionicons name="arrow-back" size={20} color={colors.text} />
-        </TouchableOpacity>
-
         <View style={styles.headerInfo}>
-          <View style={styles.headerTitleRow}>
-            <Ionicons name="shield-checkmark" size={18} color={colors.primary} />
-            <Text style={[styles.headerTitle, { color: colors.text }]}>
-              Staff Team Chat
+          <Text style={[styles.headerTitle, { color: colors.text }]}>Team chat</Text>
+          <View style={styles.headerStatusRow}>
+            <View style={[styles.onlineDot, { backgroundColor: colors.success }]} />
+            <Text style={[styles.headerSub, { color: colors.textSecondary }]}>
+              Private channel · {currentMembership?.gym?.name || 'Staff only'}
             </Text>
           </View>
-          <Text style={[styles.headerSub, { color: colors.textSecondary }]}>
-            {currentMembership?.gym?.name || 'Staff Only'}
-          </Text>
         </View>
-
-        <View style={[styles.onlineDot, { backgroundColor: colors.success }]} />
       </View>
 
       {/* Messages List */}
@@ -236,14 +236,13 @@ export default function StaffChatScreen() {
           depending on that behaviour at all.
         */
         <View style={styles.emptyContainer}>
-          <View style={[styles.emptyIconWrap, { backgroundColor: colors.surfaceElevated }]}>
-            <Ionicons name="chatbubbles-outline" size={48} color={colors.textTertiary} />
-          </View>
+          <View style={[styles.emptyRule, { backgroundColor: colors.primary }]} />
+          <Text style={[styles.emptyEyebrow, { color: colors.primary }]}>PRIVATE STAFF CHANNEL</Text>
           <Text style={[styles.emptyTitle, { color: colors.text }]}>
-            No messages yet
+            Start the handover
           </Text>
           <Text style={[styles.emptySubtitle, { color: colors.textSecondary }]}>
-            Start the conversation with your gym team and staff colleagues.
+            Share shift notes, member follow-ups, and anything the next person at the desk should know.
           </Text>
         </View>
       ) : (
@@ -266,6 +265,7 @@ export default function StaffChatScreen() {
             backgroundColor: colors.surface,
             borderTopColor: colors.border,
             paddingBottom: Math.max(insets.bottom, 12),
+            marginBottom: keyboardVisible ? 0 : 82,
           },
         ]}
       >
@@ -324,22 +324,8 @@ const styles = StyleSheet.create({
     paddingBottom: 12,
     borderBottomWidth: 1,
   },
-  backButton: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
-    borderWidth: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 12,
-  },
   headerInfo: {
     flex: 1,
-  },
-  headerTitleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
   },
   headerTitle: {
     fontSize: 17,
@@ -347,13 +333,14 @@ const styles = StyleSheet.create({
   },
   headerSub: {
     fontSize: 12,
-    marginTop: 1,
+    marginLeft: 6,
   },
   onlineDot: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
+    width: 7,
+    height: 7,
+    borderRadius: 4,
   },
+  headerStatusRow: { flexDirection: 'row', alignItems: 'center', marginTop: 2 },
   listContent: {
     paddingHorizontal: 16,
     paddingVertical: 12,
@@ -450,14 +437,8 @@ const styles = StyleSheet.create({
     paddingVertical: 80,
     paddingHorizontal: 24,
   },
-  emptyIconWrap: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 16,
-  },
+  emptyRule: { width: 44, height: 4, borderRadius: 2, marginBottom: 14 },
+  emptyEyebrow: { fontSize: 11, fontWeight: '800', letterSpacing: 1.2, marginBottom: 8 },
   emptyTitle: {
     fontSize: 18,
     fontWeight: '700',

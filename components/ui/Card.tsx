@@ -79,7 +79,7 @@ export default function Card({
 
 const styles = StyleSheet.create({
   cardBase: {
-    borderRadius: 16,
+    borderRadius: 20,
     borderWidth: 1,
     overflow: 'hidden',
   },
@@ -88,8 +88,10 @@ const styles = StyleSheet.create({
       width: 0,
       height: 2,
     },
-    shadowOpacity: 0.15,
-    shadowRadius: 8,
+    shadowOpacity: 0.12,
+    shadowRadius: 10,
+    // Android can paint a translucent elevated layer over children at
+    // elevation 1 when the same view also clips rounded corners.
     elevation: 2,
   },
   pressed: {

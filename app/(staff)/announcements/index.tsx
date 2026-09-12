@@ -16,16 +16,14 @@ import { useAppAuth } from '../../../lib/auth';
 import { useTheme } from '../../../lib/theme';
 import { useAnnouncements } from '../../../hooks/useAnnouncements';
 import { timestampLabel } from '../../../utils/date';
-import Avatar from '../../../components/ui/Avatar';
 import Badge from '../../../components/ui/Badge';
 import Card from '../../../components/ui/Card';
-import Button from '../../../components/ui/Button';
 
 export default function StaffAnnouncementsScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { profile } = useAppAuth();
-  const { colors, isDark } = useTheme();
+  const { colors } = useTheme();
 
   const {
     announcements,
@@ -74,30 +72,12 @@ export default function StaffAnnouncementsScreen() {
 
     return (
       <Card style={styles.card} padding={16}>
-        {/* Top Header */}
         <View style={styles.cardHeader}>
-          <View style={styles.authorRow}>
-            <Avatar
-              uri={item.author?.photo_url}
-              name={item.author?.full_name || 'Staff'}
-              size={38}
-            />
-            <View style={styles.authorInfo}>
-              <Text style={[styles.authorName, { color: colors.text }]}>
-                {item.author?.full_name || 'Staff Member'}
-              </Text>
-              <Text style={[styles.timeText, { color: colors.textTertiary }]}>
-                {timestampLabel(item.created_at)}
-              </Text>
-            </View>
-          </View>
-
-          <View style={styles.topRightGroup}>
-            <Badge
-              text={targetBadgeText}
-              variant="default"
-              size="sm"
-            />
+          <Badge text={targetBadgeText} variant="default" size="sm" />
+          <View style={styles.metaRow}>
+            <Text style={[styles.timeText, { color: colors.textTertiary }]} numberOfLines={1}>
+              {timestampLabel(item.created_at)} · {item.author?.full_name || 'Staff'}
+            </Text>
             {isAuthor && (
               <TouchableOpacity
                 onPress={() => handleDelete(item.id)}
@@ -131,7 +111,7 @@ export default function StaffAnnouncementsScreen() {
         renderItem={renderAnnouncementItem}
         contentContainerStyle={[
           styles.listContent,
-          { paddingTop: Math.max(insets.top + 12, 44), paddingBottom: insets.bottom + 90 },
+          { paddingTop: Math.max(insets.top + 12, 44), paddingBottom: insets.bottom + 106 },
         ]}
         showsVerticalScrollIndicator={false}
         refreshControl={
@@ -147,12 +127,19 @@ export default function StaffAnnouncementsScreen() {
             <View style={styles.headerRow}>
               <View style={styles.headerTextGroup}>
                 <Text style={[styles.headerTitle, { color: colors.text }]}>
-                  Announcements
+                  Staff Updates
                 </Text>
                 <Text style={[styles.headerSubtitle, { color: colors.textSecondary }]}>
-                  Post updates, schedule changes, and alerts for members
+                  Notices sent to members and your gym team
                 </Text>
               </View>
+              <TouchableOpacity
+                onPress={() => router.push('/(staff)/announcements/create')}
+                style={[styles.createButton, { backgroundColor: colors.primary }]}
+                accessibilityLabel="New announcement"
+              >
+                <Ionicons name="add" size={22} color="#11170B" />
+              </TouchableOpacity>
             </View>
           </View>
         }
@@ -180,17 +167,6 @@ export default function StaffAnnouncementsScreen() {
         }
       />
 
-      {/* Floating Action Button */}
-      <View style={[styles.fabContainer, { bottom: insets.bottom + 20 }]}>
-        <Button
-          title="New Announcement"
-          onPress={() => router.push('/(staff)/announcements/create')}
-          variant="primary"
-          size="lg"
-          icon={<Ionicons name="add-circle-outline" size={22} color="#000000" />}
-          style={styles.fabButton}
-        />
-      </View>
     </View>
   );
 }
@@ -212,6 +188,7 @@ const styles = StyleSheet.create({
   },
   headerTextGroup: {
     flex: 1,
+    marginRight: 14,
   },
   headerTitle: {
     fontSize: 24,
@@ -222,45 +199,42 @@ const styles = StyleSheet.create({
   headerSubtitle: {
     fontSize: 14,
   },
+  createButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   card: {
-    marginBottom: 12,
+    marginBottom: 10,
   },
   cardHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 12,
-  },
-  authorRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
-    marginRight: 10,
-  },
-  authorInfo: {
-    marginLeft: 10,
-    flex: 1,
-  },
-  authorName: {
-    fontSize: 14,
-    fontWeight: '600',
+    marginBottom: 10,
   },
   timeText: {
     fontSize: 11,
-    marginTop: 1,
+    flexShrink: 1,
+    textAlign: 'right',
   },
-  topRightGroup: {
+  metaRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
+    marginLeft: 10,
+    flexShrink: 1,
   },
   deleteButton: {
     padding: 4,
   },
   title: {
-    fontSize: 16,
-    fontWeight: '700',
+    fontSize: 18,
+    fontWeight: '800',
     marginBottom: 6,
+    lineHeight: 23,
   },
   body: {
     fontSize: 14,
@@ -295,17 +269,5 @@ const styles = StyleSheet.create({
     fontSize: 14,
     textAlign: 'center',
     lineHeight: 20,
-  },
-  fabContainer: {
-    position: 'absolute',
-    left: 16,
-    right: 16,
-  },
-  fabButton: {
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 6,
-    elevation: 5,
   },
 });

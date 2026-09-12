@@ -187,7 +187,7 @@ export default function StaffMembersScreen() {
         )}
         contentContainerStyle={[
           styles.listContent,
-          { paddingBottom: insets.bottom + 32 },
+          { paddingBottom: insets.bottom + 106 },
         ]}
         showsVerticalScrollIndicator={false}
         refreshControl={

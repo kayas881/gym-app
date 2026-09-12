@@ -33,7 +33,7 @@ import {
   parseIndianDate,
   toIndianDate,
 } from '../../../utils/date';
-import { generateReceiptHTML } from '../../../utils/receipt-template';
+import { generateReceiptHTML, RECEIPT_PDF_OPTIONS } from '../../../utils/receipt-template';
 import { KEYBOARD_AVOID_BEHAVIOR } from '../../../constants/keyboard';
 
 interface MembershipPlan {
@@ -269,7 +269,7 @@ To add time instead, use ${formatDate(
         paymentDate: new Date().toISOString(),
       });
 
-      const { uri } = await Print.printToFileAsync({ html });
+      const { uri } = await Print.printToFileAsync({ html, ...RECEIPT_PDF_OPTIONS });
 
       if (await Sharing.isAvailableAsync()) {
         await Sharing.shareAsync(uri, {

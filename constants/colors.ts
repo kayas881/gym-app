@@ -2,69 +2,69 @@
 export const Colors = {
   dark: {
     // Backgrounds
-    background: '#0F0F0F',
-    surface: '#1A1A1A',
-    surfaceElevated: '#242424',
-    card: '#1E1E1E',
+    background: '#0A0C0B',
+    surface: '#121613',
+    surfaceElevated: '#1A201C',
+    card: '#151916',
 
     // Text
-    text: '#FFFFFF',
-    textSecondary: '#A0A0A0',
-    textTertiary: '#6B6B6B',
+    text: '#F4F7F2',
+    textSecondary: '#A6AEA5',
+    textTertiary: '#687168',
 
     // Primary accent (neon green - gym vibe)
-    primary: '#00E676',
-    primaryDark: '#00C853',
-    primaryLight: '#69F0AE',
-    primaryMuted: 'rgba(0, 230, 118, 0.15)',
+    primary: '#B7F34A',
+    primaryDark: '#8FC62D',
+    primaryLight: '#D7FF8E',
+    primaryMuted: 'rgba(183, 243, 74, 0.13)',
 
     // Status colors
-    success: '#00E676',
-    warning: '#FFB300',
-    error: '#FF5252',
-    info: '#448AFF',
+    success: '#4BD982',
+    warning: '#FFC14D',
+    error: '#FF6B6B',
+    info: '#75A7FF',
 
     // Member status colors
-    statusActive: '#00E676',
-    statusPending: '#FFB300',
-    statusExpired: '#FF5252',
-    statusRejected: '#9E9E9E',
+    statusActive: '#4BD982',
+    statusPending: '#FFC14D',
+    statusExpired: '#FF6B6B',
+    statusRejected: '#8C958D',
 
     // Borders & Dividers
-    border: '#2A2A2A',
-    divider: '#1F1F1F',
+    border: '#282E2A',
+    divider: '#202522',
 
     // Input
-    inputBackground: '#1A1A1A',
-    inputBorder: '#333333',
-    inputPlaceholder: '#6B6B6B',
+    inputBackground: '#121613',
+    inputBorder: '#303832',
+    inputPlaceholder: '#687168',
 
     // Tab bar
-    tabBar: '#0F0F0F',
-    tabBarActive: '#00E676',
-    tabBarInactive: '#6B6B6B',
+    tabBar: '#141815',
+    tabBarActive: '#B7F34A',
+    tabBarInactive: '#747D75',
 
     // Misc
     overlay: 'rgba(0, 0, 0, 0.7)',
-    shadow: 'rgba(0, 0, 0, 0.3)',
+    shadow: 'rgba(0, 0, 0, 0.45)',
   },
   light: {
     // Backgrounds
-    background: '#F5F5F5',
+    background: '#F4F6EF',
     surface: '#FFFFFF',
-    surfaceElevated: '#FFFFFF',
+    surfaceElevated: '#EEF2E8',
     card: '#FFFFFF',
 
     // Text
-    text: '#1A1A1A',
-    textSecondary: '#666666',
-    textTertiary: '#999999',
+    text: '#192019',
+    textSecondary: '#606A61',
+    textTertiary: '#8A938B',
 
     // Primary accent (darker green for light mode)
-    primary: '#00C853',
-    primaryDark: '#009624',
-    primaryLight: '#5EFC82',
-    primaryMuted: 'rgba(0, 200, 83, 0.1)',
+    primary: '#78AA18',
+    primaryDark: '#5D870C',
+    primaryLight: '#B7F34A',
+    primaryMuted: 'rgba(120, 170, 24, 0.12)',
 
     // Status colors
     success: '#00C853',
@@ -79,8 +79,8 @@ export const Colors = {
     statusRejected: '#9E9E9E',
 
     // Borders & Dividers
-    border: '#E0E0E0',
-    divider: '#EEEEEE',
+    border: '#DDE3D9',
+    divider: '#E7EBE3',
 
     // Input
     inputBackground: '#F5F5F5',
@@ -89,8 +89,8 @@ export const Colors = {
 
     // Tab bar
     tabBar: '#FFFFFF',
-    tabBarActive: '#00C853',
-    tabBarInactive: '#999999',
+    tabBarActive: '#5D870C',
+    tabBarInactive: '#7D877E',
 
     // Misc
     overlay: 'rgba(0, 0, 0, 0.5)',

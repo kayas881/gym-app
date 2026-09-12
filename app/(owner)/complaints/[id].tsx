@@ -157,7 +157,12 @@ export default function OwnerComplaintDetailScreen() {
   const handleSendResponse = async () => {
     if (!complaint) return;
     if (!responseMessage.trim()) {
-      Alert.alert('Required', 'Please enter a response before resolving the complaint.');
+      Alert.alert(
+        'Response required',
+        complaint.status === 'resolved'
+          ? 'Please enter the response you want to add for this member.'
+          : 'Please enter a response before resolving the complaint.'
+      );
       return;
     }
 
@@ -173,7 +178,12 @@ export default function OwnerComplaintDetailScreen() {
             }
           : null
       );
-      Alert.alert('Resolved', 'Response saved and complaint marked as resolved.');
+      Alert.alert(
+        complaint.status === 'resolved' ? 'Response Added' : 'Resolved',
+        complaint.status === 'resolved'
+          ? 'Your response has been added to this resolved complaint.'
+          : 'Response saved and complaint marked as resolved.'
+      );
     } catch (err: any) {
       console.error('[ComplaintDetail] Response error:', err);
       Alert.alert('Error', err.message || 'Failed to submit response.');
@@ -368,9 +378,11 @@ export default function OwnerComplaintDetailScreen() {
             <View style={styles.responseHeader}>
               <Ionicons name="chatbubbles-outline" size={20} color={colors.primary} />
               <Text style={[styles.responseTitle, { color: colors.text }]}>
-                {complaint.status === 'acknowledged'
-                  ? 'Respond & Resolve Complaint'
-                  : 'Send Response'}
+                {complaint.status === 'resolved'
+                  ? 'Add a Response'
+                  : complaint.status === 'acknowledged'
+                    ? 'Respond & Resolve Complaint'
+                    : 'Send Response'}
               </Text>
             </View>
 
@@ -385,10 +397,20 @@ export default function OwnerComplaintDetailScreen() {
             />
 
             <Button
-              title="Send Response & Mark Resolved"
+              title={
+                complaint.status === 'resolved'
+                  ? 'Add Response'
+                  : 'Send Response & Mark Resolved'
+              }
               variant="primary"
               loading={isSubmittingResponse}
-              icon={<Ionicons name="checkmark-circle-outline" size={18} color="#FFFFFF" />}
+              icon={
+                <Ionicons
+                  name={complaint.status === 'resolved' ? 'send-outline' : 'checkmark-circle-outline'}
+                  size={18}
+                  color="#11170B"
+                />
+              }
               onPress={handleSendResponse}
               style={styles.sendResponseBtn}
             />

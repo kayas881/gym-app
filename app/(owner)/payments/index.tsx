@@ -24,7 +24,7 @@ import Button from '../../../components/ui/Button';
 import Avatar from '../../../components/ui/Avatar';
 import { planDurationSuffix } from '../../../utils/plan-label';
 import { formatDate, formatDateTime } from '../../../utils/date';
-import { generateReceiptHTML } from '../../../utils/receipt-template';
+import { generateReceiptHTML, RECEIPT_PDF_OPTIONS } from '../../../utils/receipt-template';
 
 type FilterPeriod = 'this_month' | 'last_month' | 'all_time';
 
@@ -187,7 +187,7 @@ export default function OwnerPaymentsScreen() {
         paymentDate: record.created_at,
       });
 
-      const { uri } = await Print.printToFileAsync({ html });
+      const { uri } = await Print.printToFileAsync({ html, ...RECEIPT_PDF_OPTIONS });
 
       if (await Sharing.isAvailableAsync()) {
         await Sharing.shareAsync(uri, {
@@ -311,10 +311,10 @@ export default function OwnerPaymentsScreen() {
       <View style={styles.header}>
         <View style={styles.headerTitleGroup}>
           <Text style={[styles.headerTitle, { color: colors.text }]}>
-            Payment History
+            Payments
           </Text>
           <Text style={[styles.headerSubtitle, { color: colors.textSecondary }]}>
-            Track member renewals and collections
+            Collections, balances and receipts
           </Text>
         </View>
 
@@ -605,9 +605,9 @@ const styles = StyleSheet.create({
     marginRight: 12,
   },
   headerTitle: {
-    fontSize: 24,
-    fontWeight: '800',
-    letterSpacing: -0.5,
+    fontSize: 27,
+    fontWeight: '900',
+    letterSpacing: -0.8,
   },
   headerSubtitle: {
     fontSize: 13,
@@ -632,8 +632,9 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   summaryCard: {
-    borderLeftWidth: 4,
-    borderLeftColor: '#00E676',
+    borderRadius: 20,
+    borderLeftWidth: 3,
+    borderLeftColor: '#B7F34A',
   },
   summaryRow: {
     flexDirection: 'row',

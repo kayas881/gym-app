@@ -22,7 +22,6 @@ import Card from '../../components/ui/Card';
 import Button from '../../components/ui/Button';
 import Avatar from '../../components/ui/Avatar';
 import Badge from '../../components/ui/Badge';
-import StatCard from '../../components/StatCard';
 import { useToday } from '../../hooks/useToday';
 
 export default function MemberHomeScreen() {
@@ -188,7 +187,7 @@ export default function MemberHomeScreen() {
     };
     return announcements
       .filter((a) => canViewAnnouncement(a.target_audience, ctx))
-      .slice(0, 3);
+      .slice(0, 2);
   }, [announcements, profile?.preferred_gym_timing, currentMembership]);
 
   const memberFirstName = profile?.full_name?.split(' ')[0] || 'Member';
@@ -199,7 +198,7 @@ export default function MemberHomeScreen() {
       <ScrollView
         contentContainerStyle={[
           styles.scrollContent,
-          { paddingTop: Math.max(insets.top + 12, 44), paddingBottom: insets.bottom + 32 },
+          { paddingTop: Math.max(insets.top + 12, 44), paddingBottom: insets.bottom + 106 },
         ]}
         showsVerticalScrollIndicator={false}
         refreshControl={
@@ -214,9 +213,8 @@ export default function MemberHomeScreen() {
         {/* Header Greeting */}
         <View style={styles.header}>
           <View style={styles.headerTextGroup}>
-            <Text style={[styles.greetingText, { color: colors.text }]}>
-              Welcome back, {memberFirstName} 👋
-            </Text>
+            <Text style={[styles.memberEyebrow, { color: colors.primary }]}>YOUR TRAINING</Text>
+            <Text style={[styles.greetingText, { color: colors.text }]}>{memberFirstName}</Text>
             <TouchableOpacity
               onPress={() => router.push('/(member)/gym-info')}
               activeOpacity={0.7}
@@ -284,7 +282,7 @@ export default function MemberHomeScreen() {
                 />
               </View>
             ) : (
-              <Card style={styles.membershipCard} padding={20}>
+              <Card style={styles.membershipCard} padding={18}>
                 <View style={styles.cardHeaderRow}>
                   <View style={styles.planInfo}>
                     <Badge
@@ -305,30 +303,23 @@ export default function MemberHomeScreen() {
                         the counter says 182 days, and the two look like a
                         contradiction rather than "you already renewed". */}
                     {upcomingSubscription ? (
-                      <Text style={[styles.renewedLine, { color: colors.primary }]}>
-                        Renewed · {upcomingSubscription.plan?.name || 'Next plan'} continues to{' '}
-                        {formatDate(upcomingSubscription.end_date)}
-                      </Text>
+                      <View style={[styles.coverageNote, { backgroundColor: colors.primaryMuted }]}>
+                        <Ionicons name="shield-checkmark-outline" size={14} color={colors.primary} />
+                        <Text style={[styles.renewedLine, { color: colors.primary }]}>
+                          Covered through {formatDate(upcomingSubscription.end_date)}
+                        </Text>
+                      </View>
                     ) : null}
                   </View>
 
-                  {/* Circular Days Counter */}
-                  <View
-                    style={[
-                      styles.countdownCircle,
-                      {
-                        backgroundColor: isDark ? 'rgba(0, 230, 118, 0.12)' : 'rgba(0, 200, 83, 0.1)',
-                        borderColor: colors.primary,
-                      },
-                    ]}
-                  >
+                  <View style={styles.coverageCount}>
                     {/* end_date is inclusive, so daysLeft is 0 on the final day
                         while the membership is still valid. "0 days left" reads
                         like it has already lapsed. */}
                     <Text style={[styles.countdownNumber, { color: colors.primary }]}>
                       {daysLeft === 0 ? 'Last' : daysLeft}
                     </Text>
-                    <Text style={[styles.countdownLabel, { color: colors.textSecondary }]}>
+                    <Text style={[styles.countdownLabel, { color: colors.textTertiary }]}>
                       {daysLeft === 0 ? 'day today' : daysLeft === 1 ? 'day left' : 'days left'}
                     </Text>
                   </View>
@@ -454,76 +445,56 @@ export default function MemberHomeScreen() {
               )}
             </View>
 
-            {/* Quick Stats */}
-            <View style={styles.statsSection}>
-              <View style={styles.statsRow}>
-                <StatCard
-                  title="This Month"
-                  value={`${thisMonthCheckIns} Days`}
-                  subtitle="Total check-ins"
-                  icon="calendar-outline"
-                  color={colors.primary}
-                  onPress={() => router.push('/(member)/attendance')}
-                  style={styles.statCardHalf}
-                />
-                {/* No onPress: there is no streak screen, so this used to be a
-                    third tap-target landing on Attendance History. Left as a
-                    read-only stat rather than a link that repeats its
-                    neighbour. */}
-                <StatCard
-                  title="Current Streak"
-                  value={`${currentStreak} ${currentStreak === 1 ? 'Day' : 'Days'}`}
-                  subtitle={currentStreak > 0 ? '🔥 On a roll!' : 'Start your streak'}
-                  icon="flame-outline"
-                  color={colors.warning}
-                  style={styles.statCardHalf}
-                />
+            {/* Training rhythm: one compact readout instead of two dashboard
+                cards competing with the membership pass above. */}
+            <TouchableOpacity
+              style={[styles.rhythmPanel, { borderColor: colors.border }]}
+              onPress={() => router.push('/(member)/attendance')}
+              activeOpacity={0.78}
+            >
+              <View style={styles.rhythmHeading}>
+                <Text style={[styles.rhythmEyebrow, { color: colors.primary }]}>TRAINING RHYTHM</Text>
+                <Ionicons name="arrow-forward" size={17} color={colors.primary} />
               </View>
-            </View>
-
-            {/* Quick Navigation Cards */}
-            <View style={styles.quickNavRow}>
-              <TouchableOpacity
-                style={[
-                  styles.quickNavCard,
-                  { backgroundColor: colors.card, borderColor: colors.border },
-                ]}
-                onPress={() => router.push('/(member)/gym-info')}
-                activeOpacity={0.7}
-              >
-                <View style={[styles.quickNavIconWrap, { backgroundColor: isDark ? 'rgba(68, 138, 255, 0.15)' : '#E3F2FD' }]}>
-                  <Ionicons name="business" size={20} color={colors.info} />
+              <View style={styles.rhythmStats}>
+                <View style={styles.rhythmItem}>
+                  <Text style={[styles.rhythmValue, { color: colors.text }]}>{thisMonthCheckIns}</Text>
+                  <Text style={[styles.rhythmLabel, { color: colors.textSecondary }]}>CHECK-INS THIS MONTH</Text>
                 </View>
-                <Text style={[styles.quickNavText, { color: colors.text }]}>My Gym</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={[
-                  styles.quickNavCard,
-                  { backgroundColor: colors.card, borderColor: colors.border },
-                ]}
-                onPress={() => router.push('/(member)/payments')}
-                activeOpacity={0.7}
-              >
-                <View style={[styles.quickNavIconWrap, { backgroundColor: isDark ? 'rgba(0, 230, 118, 0.15)' : '#E8F8F0' }]}>
-                  <Ionicons name="receipt" size={20} color={colors.primary} />
+                <View style={[styles.rhythmDivider, { backgroundColor: colors.divider }]} />
+                <View style={styles.rhythmItem}>
+                  <Text style={[styles.rhythmValue, { color: colors.text }]}>{currentStreak}</Text>
+                  <Text style={[styles.rhythmLabel, { color: colors.textSecondary }]}>DAY STREAK</Text>
                 </View>
-                <Text style={[styles.quickNavText, { color: colors.text }]}>Payments</Text>
-              </TouchableOpacity>
+              </View>
+            </TouchableOpacity>
 
-              <TouchableOpacity
-                style={[
-                  styles.quickNavCard,
-                  { backgroundColor: colors.card, borderColor: colors.border },
-                ]}
-                onPress={() => router.push('/(member)/complaints')}
-                activeOpacity={0.7}
-              >
-                <View style={[styles.quickNavIconWrap, { backgroundColor: isDark ? 'rgba(255, 179, 0, 0.15)' : '#FFF8E1' }]}>
-                  <Ionicons name="chatbox-ellipses" size={20} color={colors.warning} />
-                </View>
-                <Text style={[styles.quickNavText, { color: colors.text }]}>Complaints</Text>
-              </TouchableOpacity>
+            {/* Useful records live in a quiet member-desk list instead of
+                generic coloured icon tiles. */}
+            <View style={[styles.memberDesk, { borderColor: colors.border }]}>
+              {[
+                { label: 'My gym', detail: 'Hours and contact', route: '/(member)/gym-info' as const },
+                { label: 'Payment history', detail: 'Plans and receipts', route: '/(member)/payments' as const },
+                { label: 'Help & feedback', detail: 'Contact management', route: '/(member)/complaints' as const },
+              ].map((item, index) => (
+                <React.Fragment key={item.label}>
+                  <TouchableOpacity
+                    style={styles.memberDeskRow}
+                    onPress={() => router.push(item.route)}
+                    activeOpacity={0.7}
+                  >
+                    <Text style={[styles.memberDeskIndex, { color: index === 0 ? colors.primary : colors.textTertiary }]}>
+                      0{index + 1}
+                    </Text>
+                    <View style={styles.memberDeskCopy}>
+                      <Text style={[styles.memberDeskTitle, { color: colors.text }]}>{item.label}</Text>
+                      <Text style={[styles.memberDeskDetail, { color: colors.textSecondary }]}>{item.detail}</Text>
+                    </View>
+                    <Ionicons name="chevron-forward" size={17} color={colors.textTertiary} />
+                  </TouchableOpacity>
+                  {index < 2 ? <View style={[styles.memberDeskDivider, { backgroundColor: colors.divider }]} /> : null}
+                </React.Fragment>
+              ))}
             </View>
 
             {/* Recent Announcements Preview */}
@@ -606,10 +577,11 @@ const styles = StyleSheet.create({
     marginRight: 12,
   },
   greetingText: {
-    fontSize: 22,
-    fontWeight: '800',
-    letterSpacing: -0.4,
+    fontSize: 28,
+    fontWeight: '900',
+    letterSpacing: -0.8,
   },
+  memberEyebrow: { fontSize: 10, fontWeight: '900', letterSpacing: 1.2, marginBottom: 2 },
   gymNameRow: { flexDirection: 'row', alignItems: 'center', gap: 2 },
   gymSubTitle: {
     fontSize: 14,
@@ -655,10 +627,19 @@ const styles = StyleSheet.create({
     lineHeight: 18,
   },
   renewedLine: {
-    fontSize: 12,
-    fontWeight: '600',
-    marginTop: 6,
-    lineHeight: 17,
+    flex: 1,
+    fontSize: 11,
+    fontWeight: '700',
+    lineHeight: 15,
+  },
+  coverageNote: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    borderRadius: 9,
+    paddingHorizontal: 9,
+    paddingVertical: 6,
+    marginTop: 9,
   },
   renewButton: {
     height: 44,
@@ -686,19 +667,12 @@ const styles = StyleSheet.create({
   planDates: {
     fontSize: 13,
   },
-  countdownCircle: {
-    width: 76,
-    height: 76,
-    borderRadius: 38,
-    borderWidth: 2,
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 4,
-  },
+  coverageCount: { minWidth: 70, alignItems: 'flex-end' },
   countdownNumber: {
-    fontSize: 22,
-    fontWeight: '800',
-    lineHeight: 26,
+    fontSize: 30,
+    fontWeight: '900',
+    lineHeight: 33,
+    letterSpacing: -1,
   },
   countdownLabel: {
     fontSize: 10,
@@ -763,42 +737,37 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
   },
-  statsSection: {
-    marginBottom: 16,
+  rhythmPanel: {
+    borderTopWidth: 1,
+    borderBottomWidth: 1,
+    paddingVertical: 15,
+    marginBottom: 18,
   },
-  statsRow: {
+  rhythmHeading: {
     flexDirection: 'row',
-    gap: 12,
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 12,
   },
-  statCardHalf: {
-    flex: 1,
-  },
-  quickNavRow: {
-    flexDirection: 'row',
-    gap: 10,
-    marginBottom: 24,
-  },
-  quickNavCard: {
-    flex: 1,
-    borderRadius: 14,
+  rhythmEyebrow: { fontSize: 10, fontWeight: '900', letterSpacing: 1.1 },
+  rhythmStats: { flexDirection: 'row', alignItems: 'stretch' },
+  rhythmItem: { flex: 1 },
+  rhythmDivider: { width: 1, marginHorizontal: 18 },
+  rhythmValue: { fontSize: 27, fontWeight: '900', letterSpacing: -0.8 },
+  rhythmLabel: { fontSize: 9, lineHeight: 13, fontWeight: '800', letterSpacing: 0.55, marginTop: 3 },
+  memberDesk: {
     borderWidth: 1,
-    paddingVertical: 14,
-    paddingHorizontal: 8,
-    alignItems: 'center',
-    justifyContent: 'center',
+    borderRadius: 18,
+    paddingHorizontal: 14,
+    marginBottom: 24,
+    overflow: 'hidden',
   },
-  quickNavIconWrap: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 6,
-  },
-  quickNavText: {
-    fontSize: 12,
-    fontWeight: '600',
-  },
+  memberDeskRow: { minHeight: 62, flexDirection: 'row', alignItems: 'center' },
+  memberDeskIndex: { width: 32, fontSize: 9, fontWeight: '900', letterSpacing: 0.8 },
+  memberDeskCopy: { flex: 1 },
+  memberDeskTitle: { fontSize: 14, fontWeight: '700' },
+  memberDeskDetail: { fontSize: 11, marginTop: 2 },
+  memberDeskDivider: { height: 1, marginLeft: 32 },
   announcementsSection: {
     marginBottom: 24,
   },

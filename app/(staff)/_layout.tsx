@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import { StyleSheet, Platform } from 'react-native';
+import { StyleSheet, Platform, View } from 'react-native';
 import { Tabs, usePathname } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../../lib/theme';
@@ -37,20 +37,27 @@ export default function StaffLayout() {
         headerShown: false,
         tabBarStyle: {
           backgroundColor: colors.tabBar,
-          borderTopColor: colors.border,
-          borderTopWidth: 1,
-          height: Platform.OS === 'ios' ? 88 : 64,
-          paddingBottom: Platform.OS === 'ios' ? 28 : 10,
-          paddingTop: 8,
-          elevation: 8,
+          borderColor: colors.border,
+          borderWidth: 1,
+          height: Platform.OS === 'ios' ? 82 : 68,
+          paddingBottom: Platform.OS === 'ios' ? 22 : 7,
+          paddingTop: 7,
+          position: 'absolute',
+          left: 12,
+          right: 12,
+          bottom: Platform.OS === 'ios' ? 4 : 8,
+          borderRadius: 22,
+          elevation: 12,
           shadowColor: colors.shadow,
-          shadowOffset: { width: 0, height: -2 },
-          shadowOpacity: 0.1,
-          shadowRadius: 4,
+          shadowOffset: { width: 0, height: 6 },
+          shadowOpacity: 0.28,
+          shadowRadius: 14,
         },
         tabBarActiveTintColor: colors.tabBarActive,
         tabBarInactiveTintColor: colors.tabBarInactive,
         tabBarLabelStyle: styles.tabBarLabel,
+        tabBarItemStyle: styles.tabBarItem,
+        tabBarHideOnKeyboard: true,
       }}
     >
       <Tabs.Screen
@@ -58,11 +65,9 @@ export default function StaffLayout() {
         options={{
           title: 'Home',
           tabBarIcon: ({ color, size, focused }) => (
-            <Ionicons
-              name={focused ? 'home' : 'home-outline'}
-              size={size}
-              color={color}
-            />
+            <View style={[styles.iconWrap, focused && { backgroundColor: colors.primaryMuted }]}>
+              <Ionicons name={focused ? 'grid' : 'grid-outline'} size={size - 1} color={color} />
+            </View>
           ),
         }}
       />
@@ -71,38 +76,32 @@ export default function StaffLayout() {
         options={{
           title: 'Members',
           tabBarIcon: ({ color, size, focused }) => (
-            <Ionicons
-              name={focused ? 'people' : 'people-outline'}
-              size={size}
-              color={color}
-            />
+            <View style={[styles.iconWrap, focused && { backgroundColor: colors.primaryMuted }]}>
+              <Ionicons name={focused ? 'people' : 'people-outline'} size={size - 1} color={color} />
+            </View>
           ),
         }}
       />
       <Tabs.Screen
         name="announcements/index"
         options={{
-          title: 'Announcements',
+          title: 'Updates',
           tabBarIcon: ({ color, size, focused }) => (
-            <Ionicons
-              name={focused ? 'megaphone' : 'megaphone-outline'}
-              size={size}
-              color={color}
-            />
+            <View style={[styles.iconWrap, focused && { backgroundColor: colors.primaryMuted }]}>
+              <Ionicons name={focused ? 'megaphone' : 'megaphone-outline'} size={size - 1} color={color} />
+            </View>
           ),
         }}
       />
       <Tabs.Screen
         name="staff-chat"
         options={{
-          title: 'Chat',
+          title: 'Team',
           tabBarBadge: chatBadge,
           tabBarIcon: ({ color, size, focused }) => (
-            <Ionicons
-              name={focused ? 'chatbubbles' : 'chatbubbles-outline'}
-              size={size}
-              color={color}
-            />
+            <View style={[styles.iconWrap, focused && { backgroundColor: colors.primaryMuted }]}>
+              <Ionicons name={focused ? 'chatbubbles' : 'chatbubbles-outline'} size={size - 1} color={color} />
+            </View>
           ),
         }}
       />
@@ -112,27 +111,33 @@ export default function StaffLayout() {
         options={{
           title: 'Profile',
           tabBarIcon: ({ color, size, focused }) => (
-            <Ionicons
-              name={focused ? 'person' : 'person-outline'}
-              size={size}
-              color={color}
-            />
+            <View style={[styles.iconWrap, focused && { backgroundColor: colors.primaryMuted }]}>
+              <Ionicons name={focused ? 'person' : 'person-outline'} size={size - 1} color={color} />
+            </View>
           ),
         }}
       />
 
       {/* Pushed from other screens — not tabs. */}
-      <Tabs.Screen name="announcements/create" options={{ href: null }} />
-      <Tabs.Screen name="qr-code" options={{ href: null }} />
-      <Tabs.Screen name="invite" options={{ href: null }} />
+      <Tabs.Screen name="announcements/create" options={{ href: null, tabBarStyle: { display: 'none' } }} />
+      <Tabs.Screen name="qr-code" options={{ href: null, tabBarStyle: { display: 'none' } }} />
+      <Tabs.Screen name="invite" options={{ href: null, tabBarStyle: { display: 'none' } }} />
     </Tabs>
   );
 }
 
 const styles = StyleSheet.create({
   tabBarLabel: {
-    fontSize: 12,
-    fontWeight: '600',
-    marginTop: -2,
+    fontSize: 10,
+    fontWeight: '700',
+    marginTop: -3,
+  },
+  tabBarItem: { paddingVertical: 1 },
+  iconWrap: {
+    width: 38,
+    height: 28,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 });

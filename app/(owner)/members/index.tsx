@@ -156,17 +156,9 @@ export default function OwnerMembersListScreen() {
     <View style={[styles.screen, { backgroundColor: colors.background }]}>
       {/* Header */}
       <View style={styles.header}>
-        <TouchableOpacity
-          style={[styles.backButton, { backgroundColor: colors.surface, borderColor: colors.border }]}
-          onPress={() => router.back()}
-          activeOpacity={0.7}
-        >
-          <Ionicons name="arrow-back" size={20} color={colors.text} />
-        </TouchableOpacity>
-
         <View style={styles.headerTitleGroup}>
           <Text style={[styles.headerTitle, { color: colors.text }]}>
-            Gym Members
+            Members
           </Text>
           <Text style={[styles.headerSubtitle, { color: colors.textSecondary }]}>
             {members.length} {members.length === 1 ? 'member' : 'members'}
@@ -181,31 +173,28 @@ export default function OwnerMembersListScreen() {
           onPress={() => router.push('/(owner)/members/add')}
           activeOpacity={0.8}
         >
-          <Ionicons name="person-add" size={18} color="#000000" />
+          <Ionicons name="add" size={18} color="#11170B" />
+          <Text style={styles.addMemberText}>Add</Text>
         </TouchableOpacity>
 
-        <TouchableOpacity
-          style={[
-            styles.pendingBadgeButton,
-            {
-              backgroundColor: pendingCount > 0 ? (isDark ? 'rgba(255, 179, 0, 0.18)' : 'rgba(245, 127, 23, 0.12)') : colors.surface,
-              borderColor: pendingCount > 0 ? colors.warning : colors.border,
-            },
-          ]}
-          onPress={() => router.push('/(owner)/members/pending')}
-          activeOpacity={0.7}
-        >
-          <Ionicons
-            name="time-outline"
-            size={18}
-            color={pendingCount > 0 ? colors.warning : colors.textSecondary}
-          />
-          {pendingCount > 0 && (
+        {pendingCount > 0 ? (
+          <TouchableOpacity
+            style={[
+              styles.pendingBadgeButton,
+              {
+                backgroundColor: isDark ? 'rgba(255, 193, 77, 0.14)' : 'rgba(245, 127, 23, 0.10)',
+                borderColor: colors.warning,
+              },
+            ]}
+            onPress={() => router.push('/(owner)/members/pending')}
+            activeOpacity={0.7}
+          >
+            <Ionicons name="time-outline" size={17} color={colors.warning} />
             <View style={[styles.badgeNumber, { backgroundColor: colors.warning }]}>
               <Text style={styles.badgeNumberText}>{pendingCount}</Text>
             </View>
-          )}
-        </TouchableOpacity>
+          </TouchableOpacity>
+        ) : null}
       </View>
 
       {/* Search Bar */}
@@ -368,34 +357,32 @@ const styles = StyleSheet.create({
     paddingTop: 54,
     paddingBottom: 14,
   },
-  backButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    borderWidth: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 12,
-  },
   headerTitleGroup: {
     flex: 1,
   },
   headerTitle: {
-    fontSize: 20,
-    fontWeight: '700',
-    letterSpacing: -0.3,
+    fontSize: 26,
+    fontWeight: '900',
+    letterSpacing: -0.7,
   },
   headerSubtitle: {
     fontSize: 13,
     marginTop: 2,
   },
   addMemberButton: {
-    width: 40,
     height: 40,
     borderRadius: 20,
+    paddingHorizontal: 14,
+    flexDirection: 'row',
+    gap: 5,
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: 8,
+  },
+  addMemberText: {
+    color: '#11170B',
+    fontSize: 13,
+    fontWeight: '800',
   },
   pendingBadgeButton: {
     height: 40,
@@ -454,7 +441,7 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   listContent: {
-    paddingBottom: 90,
+    paddingBottom: 116,
   },
   loadingContainer: {
     flex: 1,

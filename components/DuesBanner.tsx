@@ -44,16 +44,19 @@ export default function DuesBanner({ style }: Props) {
       onPress={() => router.push('/(owner)/payments/dues')}
       activeOpacity={0.8}
     >
-      <Ionicons name="alert-circle" size={22} color={colors.warning} />
+      <View style={[styles.iconWrap, { backgroundColor: `${colors.warning}1F` }]}>
+        <Ionicons name="wallet-outline" size={20} color={colors.warning} />
+      </View>
       <View style={styles.textGroup}>
-        <Text style={[styles.amount, { color: colors.warning }]}>
-          ₹{totalOutstanding.toLocaleString('en-IN')} outstanding
-        </Text>
-        <Text style={[styles.sub, { color: colors.textSecondary }]}>
-          {membersOwing} {membersOwing === 1 ? 'member has' : 'members have'} a balance to pay
+        <Text style={[styles.eyebrow, { color: colors.warning }]}>TO COLLECT</Text>
+        <Text style={[styles.amount, { color: colors.text }]}>
+          ₹{totalOutstanding.toLocaleString('en-IN')} from {membersOwing}{' '}
+          {membersOwing === 1 ? 'member' : 'members'}
         </Text>
       </View>
-      <Ionicons name="chevron-forward" size={18} color={colors.warning} />
+      <View style={[styles.arrowWrap, { backgroundColor: colors.warning }]}>
+        <Ionicons name="arrow-forward" size={16} color="#201706" />
+      </View>
     </TouchableOpacity>
   );
 }
@@ -62,14 +65,28 @@ const styles = StyleSheet.create({
   banner: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
+    gap: 11,
     borderWidth: 1,
-    borderRadius: 14,
-    paddingVertical: 14,
-    paddingHorizontal: 14,
+    borderRadius: 18,
+    paddingVertical: 12,
+    paddingHorizontal: 12,
     marginBottom: 16,
   },
   textGroup: { flex: 1 },
-  amount: { fontSize: 16, fontWeight: '800' },
-  sub: { fontSize: 12, marginTop: 1 },
+  iconWrap: {
+    width: 42,
+    height: 42,
+    borderRadius: 13,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  eyebrow: { fontSize: 10, fontWeight: '800', letterSpacing: 1.2, marginBottom: 2 },
+  amount: { fontSize: 15, fontWeight: '700' },
+  arrowWrap: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
 });

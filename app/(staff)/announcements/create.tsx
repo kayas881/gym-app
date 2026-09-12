@@ -34,7 +34,7 @@ export default function StaffCreateAnnouncementScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { gymId, profile } = useAppAuth();
-  const { colors, isDark } = useTheme();
+  const { colors } = useTheme();
 
   const { createAnnouncement } = useAnnouncements();
 
@@ -153,54 +153,37 @@ export default function StaffCreateAnnouncementScreen() {
           <Text style={[styles.fieldLabel, { color: colors.textSecondary }]}>
             Target Audience
           </Text>
-          <View style={styles.audienceContainer}>
+          <View style={styles.audienceGrid}>
             {AUDIENCE_OPTIONS.map((item) => {
               const isSelected = targetAudience === item.value;
               return (
                 <TouchableOpacity
                   key={item.value}
                   style={[
-                    styles.audienceOptionCard,
+                    styles.audienceChip,
                     {
-                      backgroundColor: isSelected
-                        ? (isDark ? 'rgba(0, 230, 118, 0.12)' : '#E8F8F0')
-                        : colors.surfaceElevated,
+                      backgroundColor: isSelected ? colors.primary : colors.surfaceElevated,
                       borderColor: isSelected ? colors.primary : colors.border,
                     },
                   ]}
                   onPress={() => setTargetAudience(item.value)}
                   activeOpacity={0.7}
                 >
-                  <View style={styles.audienceTextGroup}>
-                    <Text
-                      style={[
-                        styles.audienceTitle,
-                        { color: isSelected ? colors.primary : colors.text },
-                      ]}
-                    >
-                      {item.label}
-                    </Text>
-                    <Text style={[styles.audienceDesc, { color: colors.textSecondary }]}>
-                      {item.desc}
-                    </Text>
-                  </View>
-                  <View
+                  <Text
                     style={[
-                      styles.radioCircle,
-                      {
-                        borderColor: isSelected ? colors.primary : colors.textTertiary,
-                        backgroundColor: isSelected ? colors.primary : 'transparent',
-                      },
+                      styles.audienceTitle,
+                      { color: isSelected ? '#11170B' : colors.textSecondary },
                     ]}
                   >
-                    {isSelected && (
-                      <Ionicons name="checkmark" size={14} color="#000000" />
-                    )}
-                  </View>
+                    {item.label}
+                  </Text>
                 </TouchableOpacity>
               );
             })}
           </View>
+          <Text style={[styles.audienceDesc, { color: colors.textSecondary }]}>
+            {AUDIENCE_OPTIONS.find((item) => item.value === targetAudience)?.desc}
+          </Text>
 
           {/* Post Button */}
           <View style={styles.submitSection}>
@@ -265,39 +248,30 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     marginBottom: 10,
   },
-  audienceContainer: {
-    gap: 8,
-    marginBottom: 24,
-  },
-  audienceOptionCard: {
+  audienceGrid: {
     flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    padding: 14,
-    borderRadius: 12,
-    borderWidth: 1.5,
+    flexWrap: 'wrap',
+    gap: 8,
   },
-  audienceTextGroup: {
-    flex: 1,
-    marginRight: 12,
+  audienceChip: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 13,
+    minHeight: 40,
+    borderRadius: 20,
+    borderWidth: 1,
   },
   audienceTitle: {
-    fontSize: 15,
+    fontSize: 13,
     fontWeight: '700',
-    marginBottom: 2,
   },
   audienceDesc: {
     fontSize: 12,
-  },
-  radioCircle: {
-    width: 22,
-    height: 22,
-    borderRadius: 11,
-    borderWidth: 2,
-    alignItems: 'center',
-    justifyContent: 'center',
+    lineHeight: 17,
+    marginTop: 9,
+    marginBottom: 18,
   },
   submitSection: {
-    marginTop: 6,
+    marginTop: 4,
   },
 });

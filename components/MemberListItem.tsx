@@ -103,21 +103,13 @@ export default function MemberListItem({
             >
               {name}
             </Text>
-            <View
-              style={[
-                styles.roleBadge,
-                { backgroundColor: roleStyle.bg },
-              ]}
-            >
-              <Text
-                style={[
-                  styles.roleText,
-                  { color: roleStyle.text },
-                ]}
-              >
-                {formatRoleName(role)}
-              </Text>
-            </View>
+            {role !== 'member' ? (
+              <View style={[styles.roleBadge, { backgroundColor: roleStyle.bg }]}>
+                <Text style={[styles.roleText, { color: roleStyle.text }]}>
+                  {formatRoleName(role)}
+                </Text>
+              </View>
+            ) : null}
 
             {!hasAppLogin ? (
               <View style={[styles.noAppBadge, { borderColor: colors.border }]}>
@@ -133,7 +125,7 @@ export default function MemberListItem({
                 style={[
                   styles.renewalBadge,
                   {
-                    backgroundColor: isDark ? 'rgba(0, 230, 118, 0.16)' : 'rgba(0, 200, 83, 0.12)',
+                    backgroundColor: colors.primaryMuted,
                   },
                 ]}
               >
@@ -175,8 +167,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingVertical: 12,
-    paddingHorizontal: 16,
+    paddingVertical: 14,
+    paddingHorizontal: 18,
     borderBottomWidth: 1,
   },
   leftSection: {
@@ -197,8 +189,8 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   nameText: {
-    fontSize: 15,
-    fontWeight: '600',
+    fontSize: 16,
+    fontWeight: '700',
     flexShrink: 1,
   },
   noAppBadge: {

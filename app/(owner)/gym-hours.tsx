@@ -5,6 +5,7 @@ import {
   ScrollView,
   TouchableOpacity,
   Switch,
+  TextInput,
   Alert,
   StyleSheet,
   ActivityIndicator,
@@ -23,7 +24,6 @@ import {
   DayKey,
   OperatingHours,
   defaultOperatingHours,
-  formatTime,
   isValidTime,
   parseOperatingHours,
   serializeOperatingHours,
@@ -41,7 +41,7 @@ import {
 export default function GymHoursScreen() {
   const router = useRouter();
   const { gymId, supabase } = useAppAuth();
-  const { colors, isDark } = useTheme();
+  const { colors } = useTheme();
 
   const [hours, setHours] = useState<OperatingHours>(defaultOperatingHours());
   const [note, setNote] = useState('');
@@ -291,32 +291,55 @@ export default function GymHoursScreen() {
                 {day.closed ? null : (
                   <View style={styles.timesRow}>
                     <View style={styles.timeField}>
-                      <Input
-                        label="Opens"
-                        placeholder="06:00"
+                      <Text style={[styles.timeLabel, { color: colors.textTertiary }]}>OPENS</Text>
+                      <TextInput
                         value={day.open}
                         onChangeText={(value) => updateDay(key, { open: value.trim() })}
+                        placeholder="06:00"
+                        placeholderTextColor={colors.inputPlaceholder}
                         keyboardType="numbers-and-punctuation"
-                        error={openInvalid ? 'Use HH:MM' : undefined}
+                        maxLength={5}
+                        selectTextOnFocus
+                        style={[
+                          styles.timeInput,
+                          {
+                            color: colors.text,
+                            backgroundColor: colors.inputBackground,
+                            borderColor: openInvalid ? colors.error : colors.inputBorder,
+                          },
+                        ]}
                       />
                     </View>
+                    <Text style={[styles.timeSeparator, { color: colors.textTertiary }]}>to</Text>
                     <View style={styles.timeField}>
-                      <Input
-                        label="Closes"
-                        placeholder="22:00"
+                      <Text style={[styles.timeLabel, { color: colors.textTertiary }]}>CLOSES</Text>
+                      <TextInput
                         value={day.close}
                         onChangeText={(value) => updateDay(key, { close: value.trim() })}
+                        placeholder="22:00"
+                        placeholderTextColor={colors.inputPlaceholder}
                         keyboardType="numbers-and-punctuation"
-                        error={closeInvalid ? 'Use HH:MM' : undefined}
+                        maxLength={5}
+                        selectTextOnFocus
+                        style={[
+                          styles.timeInput,
+                          {
+                            color: colors.text,
+                            backgroundColor: colors.inputBackground,
+                            borderColor: closeInvalid ? colors.error : colors.inputBorder,
+                          },
+                        ]}
                       />
                     </View>
                   </View>
                 )}
 
-                {!day.closed && isValidTime(day.open) && isValidTime(day.close) ? (
-                  <Text style={[styles.dayPreview, { color: colors.textTertiary }]}>
-                    {formatTime(day.open)} – {formatTime(day.close)}
-                    {day.close <= day.open ? '  (overnight, closes next morning)' : ''}
+                {!day.closed &&
+                isValidTime(day.open) &&
+                isValidTime(day.close) &&
+                day.close <= day.open ? (
+                  <Text style={[styles.overnightNote, { color: colors.warning }]}>
+                    Closes the following morning
                   </Text>
                 ) : null}
               </Card>
@@ -348,6 +371,16 @@ export default function GymHoursScreen() {
             </Text>
           </View>
 
+        </ScrollView>
+      )}
+
+      {!loading ? (
+        <View
+          style={[
+            styles.saveFooter,
+            { backgroundColor: colors.background, borderTopColor: colors.divider },
+          ]}
+        >
           {hasChanges ? (
             <Button
               title="Save Opening Hours"
@@ -355,16 +388,18 @@ export default function GymHoursScreen() {
               loading={saving}
               onPress={handleSave}
               fullWidth
-              icon={<Ionicons name="save-outline" size={18} color="#000000" />}
-              style={{ marginTop: 16 }}
+              icon={<Ionicons name="save-outline" size={18} color="#11170B" />}
             />
           ) : (
-            <Text style={[styles.savedNote, { color: colors.textTertiary }]}>
-              Saved. Change a day to enable saving again.
-            </Text>
+            <View style={[styles.savedState, { backgroundColor: colors.surfaceElevated }]}>
+              <Ionicons name="checkmark-circle" size={18} color={colors.success} />
+              <Text style={[styles.savedStateText, { color: colors.textSecondary }]}>
+                Opening hours are saved
+              </Text>
+            </View>
           )}
-        </ScrollView>
-      )}
+        </View>
+      ) : null}
     </View>
   );
 }
@@ -389,7 +424,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   headerTitle: { fontSize: 18, fontWeight: '700' },
-  scrollContent: { paddingHorizontal: 16, paddingBottom: 48 },
+  scrollContent: { paddingHorizontal: 16, paddingBottom: 18 },
   legacyNotice: {
     flexDirection: 'row',
     alignItems: 'flex-start',
@@ -413,7 +448,7 @@ const styles = StyleSheet.create({
     marginBottom: 14,
   },
   copyText: { fontSize: 14, fontWeight: '600' },
-  dayCard: { borderRadius: 14, marginBottom: 10 },
+  dayCard: { borderRadius: 14, marginBottom: 8 },
   dayHeader: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -424,9 +459,19 @@ const styles = StyleSheet.create({
   todayTag: { fontSize: 10, fontWeight: '800', letterSpacing: 0.5 },
   switchGroup: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   switchLabel: { fontSize: 12, fontWeight: '600' },
-  timesRow: { flexDirection: 'row', gap: 12, marginTop: 10 },
+  timesRow: { flexDirection: 'row', alignItems: 'flex-end', gap: 8, marginTop: 10 },
   timeField: { flex: 1 },
-  dayPreview: { fontSize: 11, marginTop: -6 },
+  timeLabel: { fontSize: 9, fontWeight: '800', letterSpacing: 0.6, marginBottom: 4 },
+  timeInput: {
+    height: 42,
+    borderWidth: 1,
+    borderRadius: 11,
+    paddingHorizontal: 12,
+    fontSize: 16,
+    fontWeight: '700',
+  },
+  timeSeparator: { fontSize: 11, fontWeight: '600', paddingBottom: 14 },
+  overnightNote: { fontSize: 10, fontWeight: '600', marginTop: 6 },
   noteCard: { borderRadius: 14, marginTop: 4 },
   previewBox: {
     borderWidth: 1,
@@ -436,5 +481,19 @@ const styles = StyleSheet.create({
   },
   previewLabel: { fontSize: 10, fontWeight: '700', letterSpacing: 0.5, marginBottom: 4 },
   previewValue: { fontSize: 14, fontWeight: '600', lineHeight: 20 },
-  savedNote: { fontSize: 12, textAlign: 'center', marginTop: 18 },
+  saveFooter: {
+    borderTopWidth: StyleSheet.hairlineWidth,
+    paddingHorizontal: 16,
+    paddingTop: 10,
+    paddingBottom: 16,
+  },
+  savedState: {
+    height: 44,
+    borderRadius: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 7,
+  },
+  savedStateText: { fontSize: 13, fontWeight: '600' },
 });

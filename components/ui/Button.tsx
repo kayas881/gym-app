@@ -83,6 +83,7 @@ export default function Button({
   const getTextColor = (): string => {
     switch (variant) {
       case 'primary':
+        return '#11170B';
       case 'danger':
         return '#FFFFFF';
       case 'outline':
@@ -159,7 +160,7 @@ export default function Button({
 
 const styles = StyleSheet.create({
   base: {
-    borderRadius: 12,
+    borderRadius: 14,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
@@ -187,11 +188,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
   },
   sizeMd: {
-    height: 44,
+    height: 48,
     paddingHorizontal: 16,
   },
   sizeLg: {
-    height: 52,
+    height: 56,
     paddingHorizontal: 20,
   },
   // Text sizes

@@ -1,5 +1,8 @@
 import { RECEIPT_PREFIX } from '../constants/config';
-import { formatDate } from './date';
+import { formatDate, today } from './date';
+
+// expo-print sizes custom pages in points (72 points per inch).
+export const RECEIPT_PDF_OPTIONS = { width: 595, height: 842 } as const;
 
 interface ReceiptData {
   gymName: string;
@@ -16,147 +19,167 @@ interface ReceiptData {
   paymentDate: string;
 }
 
-/**
- * Generate an HTML template for a payment receipt.
- * Used with expo-print to create a shareable PDF.
- */
+/** Generate an A4 HTML payment receipt for expo-print. */
 export function generateReceiptHTML(data: ReceiptData): string {
+  const gymName = escapeHtml(data.gymName);
+  const memberName = escapeHtml(data.memberName);
+  const memberEmail = escapeHtml(data.memberEmail || 'Not provided');
+  const planName = escapeHtml(data.planName);
+  const paymentMethod = escapeHtml(data.paymentMethod.toUpperCase());
+  const receiptNumber = escapeHtml(data.receiptNumber);
+  const term = `${data.durationMonths} ${data.durationMonths === 1 ? 'month' : 'months'}`;
+  const amount = data.amountPaid.toLocaleString('en-IN');
+
   return `
 <!DOCTYPE html>
 <html>
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
   <style>
+    @page { size: A4 portrait; margin: 0; }
     * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body { width: 210mm; height: 297mm; }
     body {
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-      padding: 40px;
-      color: #1a1a1a;
+      color: #171a16;
       background: #fff;
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
     }
-    .receipt {
-      max-width: 500px;
-      margin: 0 auto;
-      border: 2px solid #00C853;
-      border-radius: 16px;
-      overflow: hidden;
+    .receipt { min-height: 297mm; display: flex; flex-direction: column; }
+    .header { background: #10130f; color: #fff; padding: 20mm 18mm 15mm; }
+    .header-top { display: flex; justify-content: space-between; align-items: flex-start; }
+    .brand { font-size: 27px; line-height: 1.1; font-weight: 800; letter-spacing: -0.6px; }
+    .document-label {
+      margin-top: 6px; color: #a8afa5; font-size: 10px; font-weight: 700;
+      letter-spacing: 2.2px;
     }
-    .header {
-      background: #0F0F0F;
-      color: #fff;
-      padding: 24px;
-      text-align: center;
+    .receipt-meta { text-align: right; }
+    .meta-label {
+      color: #8f968c; font-size: 9px; font-weight: 700; letter-spacing: 1.2px;
+      text-transform: uppercase;
     }
-    .header h1 {
-      font-size: 24px;
-      color: #B7F34A;
-      margin-bottom: 4px;
+    .receipt-number { margin-top: 5px; font-size: 12px; font-weight: 700; letter-spacing: 0.4px; }
+    .amount-block { margin-top: 20mm; }
+    .amount-label {
+      color: #a8afa5; font-size: 10px; font-weight: 700; letter-spacing: 1.5px;
+      text-transform: uppercase;
     }
-    .header p {
-      font-size: 12px;
-      color: #a0a0a0;
+    .amount {
+      margin-top: 3px; color: #b7f34a; font-size: 42px; line-height: 1;
+      font-weight: 800; letter-spacing: -1.5px;
     }
-    .receipt-number {
-      background: #1a1a1a;
-      color: #B7F34A;
-      text-align: center;
-      padding: 8px;
-      font-size: 14px;
-      font-weight: bold;
-      letter-spacing: 1px;
+    .content { flex: 1; padding: 15mm 18mm 12mm; }
+    .section { margin-bottom: 12mm; }
+    .section-title {
+      margin-bottom: 6mm; color: #72786f; font-size: 9px; font-weight: 800;
+      letter-spacing: 1.6px; text-transform: uppercase;
     }
-    .body {
-      padding: 24px;
+    .person-name { font-size: 22px; line-height: 1.2; font-weight: 750; }
+    .person-email { margin-top: 4px; color: #747a71; font-size: 11px; }
+    .membership-card {
+      padding: 8mm; border: 1px solid #dfe4dc; border-left: 4px solid #9bd632;
+      border-radius: 8px; background: #f7f9f5;
     }
-    .row {
-      display: flex;
-      justify-content: space-between;
-      padding: 10px 0;
-      border-bottom: 1px solid #eee;
+    .plan-row { display: flex; justify-content: space-between; align-items: baseline; }
+    .plan-name { font-size: 18px; font-weight: 750; }
+    .plan-term { color: #62685f; font-size: 11px; font-weight: 650; }
+    .coverage { display: flex; align-items: center; margin-top: 7mm; }
+    .date-block { flex: 1; }
+    .date-block:last-child { text-align: right; }
+    .date-label {
+      color: #858b82; font-size: 8px; font-weight: 700; letter-spacing: 1px;
+      text-transform: uppercase;
     }
-    .row:last-child { border-bottom: none; }
-    .row .label {
-      color: #666;
-      font-size: 13px;
+    .date-value { margin-top: 3px; font-size: 13px; font-weight: 700; }
+    .date-line { flex: 1; height: 1px; margin: 0 8mm; background: #cbd1c8; position: relative; }
+    .date-line:after {
+      content: ''; position: absolute; right: -1px; top: -3px; width: 6px; height: 6px;
+      border-top: 1px solid #9da39a; border-right: 1px solid #9da39a; transform: rotate(45deg);
     }
-    .row .value {
-      font-weight: 600;
-      font-size: 14px;
-      text-align: right;
+    .details { display: flex; gap: 8mm; }
+    .detail { flex: 1; padding-top: 5mm; border-top: 1px solid #dfe4dc; }
+    .detail-label {
+      color: #7b8178; font-size: 8px; font-weight: 700; letter-spacing: 1px;
+      text-transform: uppercase;
     }
-    .amount-row {
-      background: #f0faf5;
-      margin: 16px -24px;
-      padding: 16px 24px;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-    }
-    .amount-row .label {
-      font-size: 16px;
-      font-weight: 600;
-    }
-    .amount-row .value {
-      font-size: 24px;
-      font-weight: 800;
-      color: #00C853;
-    }
+    .detail-value { margin-top: 4px; font-size: 12px; font-weight: 700; }
     .footer {
-      text-align: center;
-      padding: 16px;
-      background: #f9f9f9;
-      font-size: 11px;
-      color: #999;
+      display: flex; justify-content: space-between; align-items: flex-end; margin: 0 18mm;
+      padding: 8mm 0 13mm; border-top: 1px solid #e0e4dd; color: #858b82;
+      font-size: 8.5px; line-height: 1.55;
     }
+    .footer-brand { color: #30352e; font-size: 10px; font-weight: 750; }
   </style>
 </head>
 <body>
   <div class="receipt">
     <div class="header">
-      <h1>${escapeHtml(data.gymName)}</h1>
-      <p>PAYMENT RECEIPT</p>
-    </div>
-    <div class="receipt-number">
-      ${escapeHtml(data.receiptNumber)}
-    </div>
-    <div class="body">
-      <div class="row">
-        <span class="label">Member Name</span>
-        <span class="value">${escapeHtml(data.memberName)}</span>
+      <div class="header-top">
+        <div>
+          <div class="brand">${gymName}</div>
+          <div class="document-label">PAYMENT RECEIPT</div>
+        </div>
+        <div class="receipt-meta">
+          <div class="meta-label">Receipt number</div>
+          <div class="receipt-number">${receiptNumber}</div>
+        </div>
       </div>
-      <div class="row">
-        <span class="label">Email</span>
-        <span class="value">${escapeHtml(data.memberEmail)}</span>
-      </div>
-      <div class="row">
-        <span class="label">Plan</span>
-        <span class="value">${escapeHtml(data.planName)} (${data.durationMonths} months)</span>
-      </div>
-      <div class="row">
-        <span class="label">Membership Start</span>
-        <span class="value">${formatDate(data.startDate)}</span>
-      </div>
-      <div class="row">
-        <span class="label">Membership End</span>
-        <span class="value">${formatDate(data.endDate)}</span>
-      </div>
-      <div class="row">
-        <span class="label">Payment Method</span>
-        <span class="value">${data.paymentMethod.toUpperCase()}</span>
-      </div>
-      <div class="row">
-        <span class="label">Payment Date</span>
-        <span class="value">${formatDate(data.paymentDate)}</span>
-      </div>
-      <div class="amount-row">
-        <span class="label">Amount Paid</span>
-        <span class="value">₹${data.amountPaid.toLocaleString('en-IN')}</span>
+      <div class="amount-block">
+        <div class="amount-label">Amount received</div>
+        <div class="amount">&#8377;${amount}</div>
       </div>
     </div>
+
+    <main class="content">
+      <section class="section">
+        <div class="section-title">Received from</div>
+        <div class="person-name">${memberName}</div>
+        <div class="person-email">${memberEmail}</div>
+      </section>
+
+      <section class="section">
+        <div class="section-title">Membership</div>
+        <div class="membership-card">
+          <div class="plan-row">
+            <div class="plan-name">${planName}</div>
+            <div class="plan-term">${term}</div>
+          </div>
+          <div class="coverage">
+            <div class="date-block">
+              <div class="date-label">Starts</div>
+              <div class="date-value">${formatDate(data.startDate)}</div>
+            </div>
+            <div class="date-line"></div>
+            <div class="date-block">
+              <div class="date-label">Ends</div>
+              <div class="date-value">${formatDate(data.endDate)}</div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="section">
+        <div class="section-title">Payment details</div>
+        <div class="details">
+          <div class="detail">
+            <div class="detail-label">Payment method</div>
+            <div class="detail-value">${paymentMethod}</div>
+          </div>
+          <div class="detail">
+            <div class="detail-label">Payment date</div>
+            <div class="detail-value">${formatDate(data.paymentDate)}</div>
+          </div>
+        </div>
+      </section>
+    </main>
+
     <div class="footer">
-      This is a computer-generated receipt and does not require a signature.<br>
-      Generated on ${formatDate(new Date().toISOString())}
+      <div>
+        <div class="footer-brand">${gymName}</div>
+        This is a computer-generated receipt and does not require a signature.
+      </div>
+      <div>Generated on ${formatDate(today())}</div>
     </div>
   </div>
 </body>
@@ -164,26 +187,16 @@ export function generateReceiptHTML(data: ReceiptData): string {
 }
 
 /**
- * Generate a unique receipt number.
- * Format: GYM-YYYYMMDD-XXXX (e.g., GYM-20240315-A3B7)
- */
-/**
- * @deprecated Receipt numbers are now generated inside the
- * `record_subscription_payment` Postgres function, which retries on collision.
- * This client-side version used only 4 random base-36 characters per day
- * against a UNIQUE NOT NULL column with no retry. Kept for reference only —
- * nothing calls it.
+ * @deprecated Receipt numbers are generated by `record_subscription_payment`,
+ * which retries on collision. Kept for reference only; nothing calls it.
  */
 export function generateReceiptNumber(): string {
-  const now = new Date();
-  const dateStr = now.toISOString().split('T')[0].replace(/-/g, '');
+  const dateStr = today().replace(/-/g, '');
   const random = Math.random().toString(36).substring(2, 6).toUpperCase();
   return `${RECEIPT_PREFIX}-${dateStr}-${random}`;
 }
 
-/**
- * Escape HTML special characters to prevent XSS in receipt template.
- */
+/** Escape HTML special characters to prevent XSS in receipt output. */
 function escapeHtml(text: string): string {
   const map: Record<string, string> = {
     '&': '&amp;',
