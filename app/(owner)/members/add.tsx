@@ -16,7 +16,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAppAuth } from '../../../lib/auth';
 import { useTheme } from '../../../lib/theme';
-import { uploadImageAssetToPath } from '../../../lib/storage';
+import { uploadImageAsset } from '../../../lib/storage';
 import { KEYBOARD_AVOID_BEHAVIOR } from '../../../constants/keyboard';
 import Input from '../../../components/ui/Input';
 import Button from '../../../components/ui/Button';
@@ -126,7 +126,7 @@ export default function AddMemberScreen() {
       //    than losing them.
       if (photo && gymMemberId && userId) {
         try {
-          const url = await uploadImageAssetToPath(
+          const url = await uploadImageAsset(
             supabase,
             'profile-photos',
             userId,
