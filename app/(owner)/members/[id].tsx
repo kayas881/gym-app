@@ -12,8 +12,10 @@ import {
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import * as ImagePicker from 'expo-image-picker';
 import { useAppAuth } from '../../../lib/auth';
 import { useTheme } from '../../../lib/theme';
+import { uploadImageAsset } from '../../../lib/storage';
 import { useSubscriptions } from '../../../hooks/useSubscriptions';
 import Avatar from '../../../components/ui/Avatar';
 import Card from '../../../components/ui/Card';
@@ -72,7 +74,7 @@ interface MembershipPlan {
 export default function MemberDetailScreen() {
   const { id, action } = useLocalSearchParams<{ id: string; action?: string }>();
   const router = useRouter();
-  const { supabase, gymId, isSignedIn } = useAppAuth();
+  const { supabase, gymId, isSignedIn, userId } = useAppAuth();
   const { colors, isDark } = useTheme();
 
   // Must stay above the early returns below: it is a hook, and sitting after
@@ -85,6 +87,7 @@ export default function MemberDetailScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [actionLoading, setActionLoading] = useState(false);
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
 
   // Subscriptions hook
   const {
@@ -644,6 +647,64 @@ export default function MemberDetailScreen() {
   // way to scan the check-in QR.
   const hasAppLogin = !!member?.profile?.clerk_id;
 
+  // Add Member's failure path tells the owner "you can add their photo later
+  // from their profile" -- this is that promise. update_managed_member itself
+  // refuses anyone with a clerk_id, so this is scoped to managed members only,
+  // same as the RPC's own guard.
+  const pickAndUploadPhoto = async (fromCamera: boolean) => {
+    if (!member || !userId) return;
+    try {
+      const permission = fromCamera
+        ? await ImagePicker.requestCameraPermissionsAsync()
+        : await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (permission.status !== 'granted') {
+        Alert.alert(
+          fromCamera ? 'Camera Permission Needed' : 'Permission Needed',
+          fromCamera ? 'We need the camera to photograph the member.' : 'We need access to your photos.'
+        );
+        return;
+      }
+
+      const pickerOptions: ImagePicker.ImagePickerOptions = {
+        mediaTypes: ['images'],
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 0.7,
+        base64: true,
+      };
+      const result = fromCamera
+        ? await ImagePicker.launchCameraAsync(pickerOptions)
+        : await ImagePicker.launchImageLibraryAsync(pickerOptions);
+      if (result.canceled || !result.assets?.[0]) return;
+
+      setUploadingPhoto(true);
+      const url = await uploadImageAsset(supabase, 'profile-photos', userId, result.assets[0]);
+      // Photo-only RPC on purpose: member state here loads async after
+      // navigation, so name/phone can still be the PREVIOUS profile's values
+      // for a moment after switching between two members. A function that
+      // only ever touches photo_url has no stale field left to overwrite.
+      const { error } = await supabase.rpc('update_managed_member_photo', {
+        p_gym_member_id: id,
+        p_photo_url: url,
+      });
+      if (error) throw error;
+      await fetchMemberDetail();
+    } catch (err: any) {
+      console.error('[MemberDetail] Photo update failed:', err);
+      Alert.alert('Could not update photo', err?.message || 'Please try again.');
+    } finally {
+      setUploadingPhoto(false);
+    }
+  };
+
+  const handleChangePhoto = () => {
+    Alert.alert('Update photo', undefined, [
+      { text: 'Take Photo', onPress: () => pickAndUploadPhoto(true) },
+      { text: 'Choose from Library', onPress: () => pickAndUploadPhoto(false) },
+      { text: 'Cancel', style: 'cancel' },
+    ]);
+  };
+
   // Only the plan being displayed on this card. Other subscriptions with their
   // own balances are listed on the Dues screen.
   const balanceDue = activeSubscription
@@ -700,11 +761,33 @@ export default function MemberDetailScreen() {
         {/* Profile Card */}
         <Card style={styles.profileCard} padding={20}>
           <View style={styles.profileTopRow}>
-            <Avatar
-              uri={member.profile?.photo_url}
-              name={member.profile?.full_name || 'Member'}
-              size={72}
-            />
+            {hasAppLogin ? (
+              <Avatar
+                uri={member.profile?.photo_url}
+                name={member.profile?.full_name || 'Member'}
+                size={72}
+              />
+            ) : (
+              <TouchableOpacity
+                onPress={handleChangePhoto}
+                style={styles.avatarWrap}
+                activeOpacity={0.8}
+                disabled={uploadingPhoto}
+              >
+                <Avatar
+                  uri={member.profile?.photo_url}
+                  name={member.profile?.full_name || 'Member'}
+                  size={72}
+                />
+                <View style={[styles.cameraBadge, { backgroundColor: colors.primary }]}>
+                  {uploadingPhoto ? (
+                    <ActivityIndicator size="small" color="#000000" />
+                  ) : (
+                    <Ionicons name="camera" size={16} color="#000000" />
+                  )}
+                </View>
+              </TouchableOpacity>
+            )}
             <View style={styles.profileHeaderInfo}>
               <Text style={[styles.profileName, { color: colors.text }]}>
                 {member.profile?.full_name || 'Anonymous Member'}
@@ -1436,6 +1519,19 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 16,
+  },
+  avatarWrap: {
+    position: 'relative',
+  },
+  cameraBadge: {
+    position: 'absolute',
+    bottom: -2,
+    right: -2,
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   profileHeaderInfo: {
     flex: 1,
