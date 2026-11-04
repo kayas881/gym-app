@@ -1,0 +1,32 @@
+-- Isolation check for migration 039. Run against the hosted project AFTER the
+-- migration is applied. Do not apply this file; it is a read/write rehearsal
+-- that rolls back.
+--
+-- Replace the two clerk ids with real gym-app development users, then:
+--
+--   begin;
+--   -- paste one block
+--   rollback;
+--
+-- auth.uid() stays NULL on purpose. Claims go through request.jwt.claims so
+-- get_clerk_id() / get_current_profile_id() resolve the same way the app does.
+
+-- A. Member A can create today's session and insert a set.
+-- begin;
+-- set local role authenticated;
+-- set local request.jwt.claims = '{"sub":"user_A_clerk_id","role":"authenticated"}';
+-- select public.ensure_today_workout_session();
+-- -- insert a set against the returned session_id, then
+-- select count(*) from public.workout_sets;
+-- rollback;
+
+-- B. Member B must see zero of A's rows, and an update/delete of A's client_id
+-- must change zero rows (RLS, not an error).
+-- begin;
+-- set local role authenticated;
+-- set local request.jwt.claims = '{"sub":"user_B_clerk_id","role":"authenticated"}';
+-- select count(*) from public.workout_sessions;
+-- select count(*) from public.workout_sets;
+-- update public.workout_sets set exercise = 'nope' where client_id = 'A-client-uuid';
+-- delete from public.workout_sets where client_id = 'A-client-uuid';
+-- rollback;

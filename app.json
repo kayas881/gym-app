@@ -66,6 +66,12 @@
           "color": "#B7F34A",
           "defaultChannel": "default"
         }
+      ],
+      [
+        "expo-audio",
+        {
+          "microphonePermission": "Allow Gymnos to record a set so it can log the exercise, weight and reps."
+        }
       ]
     ],
     "extra": {

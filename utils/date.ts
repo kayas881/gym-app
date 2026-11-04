@@ -181,6 +181,29 @@ export function daysFromToday(days: number): string {
 }
 
 /**
+ * Shift a stored YYYY-MM-DD by a number of local calendar days.
+ */
+export function addDays(iso: string, days: number): string {
+  const [year, month, day] = iso.split('-').map(Number);
+  const date = new Date(year, month - 1, day);
+  date.setDate(date.getDate() + days);
+  return toLocalDateString(date);
+}
+
+/**
+ * Monday of the week that contains `iso`, as YYYY-MM-DD.
+ * Weeks start Monday so a Sunday session stays in the week that just ended.
+ */
+export function mondayOf(iso: string): string {
+  const [year, month, day] = iso.split('-').map(Number);
+  const date = new Date(year, month - 1, day);
+  const weekday = date.getDay();
+  const delta = weekday === 0 ? -6 : 1 - weekday;
+  date.setDate(date.getDate() + delta);
+  return toLocalDateString(date);
+}
+
+/**
  * The local calendar day (YYYY-MM-DD) that a timestamp falls on.
  *
  * `timestamp.split('T')[0]` looks equivalent but reads the UTC day, so a 1am

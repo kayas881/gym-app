@@ -5,6 +5,7 @@
   },
   // Supabase Edge Functions run on Deno, not React Native: they use Deno
   // globals and jsr: imports this project's TypeScript cannot resolve. Deno /
-  // the Supabase CLI typechecks them instead.
-  "exclude": ["node_modules", "supabase/functions"]
+  // the Supabase CLI typechecks them instead. scripts/ is standalone Node /
+  // Python tooling, not part of the Expo bundle.
+  "exclude": ["node_modules", "supabase/functions", "scripts"]
 }

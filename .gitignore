@@ -30,8 +30,24 @@ yarn-error.*
 .DS_Store
 *.pem
 
-# local env files
+# local env files — never commit Clerk/Supabase/Meta secrets
+.env
 .env*.local
+
+# Supabase CLI local state
+supabase/.temp/
+supabase/.branches/
+
+# Python test cache
+__pycache__/
+*.pyc
+
+# Phone screenshots used only for local UX review
+/edit routine/
+/log a set/
+
+# Separate gymnos.tech site with its own git history
+/landing/
 
 # typescript
 *.tsbuildinfo

@@ -443,6 +443,22 @@ export default function MemberHomeScreen() {
                   style={styles.checkInButton}
                 />
               )}
+              <Button
+                title="Log a set"
+                onPress={() => router.push('/(member)/session')}
+                variant="secondary"
+                size="lg"
+                fullWidth
+                icon={<Ionicons name="mic-outline" size={22} color={colors.text} />}
+                style={styles.logSetButton}
+              />
+              <Button
+                title="Today's workout"
+                onPress={() => router.push('/(member)/workouts')}
+                variant="ghost"
+                size="lg"
+                fullWidth
+              />
             </View>
 
             {/* Training rhythm: one compact readout instead of two dashboard
@@ -473,6 +489,8 @@ export default function MemberHomeScreen() {
                 generic coloured icon tiles. */}
             <View style={[styles.memberDesk, { borderColor: colors.border }]}>
               {[
+                { label: 'Workouts', detail: 'Routines and today\'s plan', route: '/(member)/workouts' as const },
+                { label: 'Progress', detail: 'Records and overload', route: '/(member)/progress' as const },
                 { label: 'My gym', detail: 'Hours and contact', route: '/(member)/gym-info' as const },
                 { label: 'Payment history', detail: 'Plans and receipts', route: '/(member)/payments' as const },
                 { label: 'Help & feedback', detail: 'Contact management', route: '/(member)/complaints' as const },
@@ -492,7 +510,7 @@ export default function MemberHomeScreen() {
                     </View>
                     <Ionicons name="chevron-forward" size={17} color={colors.textTertiary} />
                   </TouchableOpacity>
-                  {index < 2 ? <View style={[styles.memberDeskDivider, { backgroundColor: colors.divider }]} /> : null}
+                  {index < 4 ? <View style={[styles.memberDeskDivider, { backgroundColor: colors.divider }]} /> : null}
                 </React.Fragment>
               ))}
             </View>
@@ -723,6 +741,10 @@ const styles = StyleSheet.create({
   },
   checkInButton: {
     height: 54,
+  },
+  logSetButton: {
+    height: 54,
+    marginTop: 10,
   },
   checkedInBanner: {
     flexDirection: 'row',

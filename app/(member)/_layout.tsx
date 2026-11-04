@@ -46,6 +46,28 @@ export default function MemberLayout() {
         }}
       />
       <Tabs.Screen
+        name="workouts/index"
+        options={{
+          title: 'Workouts',
+          tabBarIcon: ({ color, size, focused }) => (
+            <View style={[styles.iconWrap, focused && { backgroundColor: colors.primaryMuted }]}>
+              <Ionicons name={focused ? 'list' : 'list-outline'} size={size - 1} color={color} />
+            </View>
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="progress/index"
+        options={{
+          title: 'Progress',
+          tabBarIcon: ({ color, size, focused }) => (
+            <View style={[styles.iconWrap, focused && { backgroundColor: colors.primaryMuted }]}>
+              <Ionicons name={focused ? 'barbell' : 'barbell-outline'} size={size - 1} color={color} />
+            </View>
+          ),
+        }}
+      />
+      <Tabs.Screen
         name="attendance"
         options={{
           title: 'Attendance',
@@ -97,6 +119,20 @@ export default function MemberLayout() {
       <Tabs.Screen name="renew" options={{ href: null, tabBarStyle: { display: 'none' } }} />
       <Tabs.Screen name="complaints/index" options={{ href: null, tabBarStyle: { display: 'none' } }} />
       <Tabs.Screen name="complaints/create" options={{ href: null, tabBarStyle: { display: 'none' } }} />
+      <Tabs.Screen name="session" options={{ href: null, tabBarStyle: { display: 'none' } }} />
+      <Tabs.Screen
+        name="progress/[exerciseKey]"
+        options={{ href: null, tabBarStyle: { display: 'none' } }}
+      />
+      <Tabs.Screen name="sessions/index" options={{ href: null, tabBarStyle: { display: 'none' } }} />
+      <Tabs.Screen
+        name="sessions/[sessionId]"
+        options={{ href: null, tabBarStyle: { display: 'none' } }}
+      />
+      <Tabs.Screen name="workouts/edit" options={{ href: null, tabBarStyle: { display: 'none' } }} />
+      <Tabs.Screen name="workouts/library" options={{ href: null, tabBarStyle: { display: 'none' } }} />
+      <Tabs.Screen name="workouts/schedule" options={{ href: null, tabBarStyle: { display: 'none' } }} />
+      <Tabs.Screen name="workouts/active" options={{ href: null, tabBarStyle: { display: 'none' } }} />
     </Tabs>
   );
 }

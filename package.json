@@ -8,6 +8,7 @@
     "@supabase/supabase-js": "^2.112.4",
     "base64-arraybuffer": "^1.0.2",
     "expo": "~57.0.18",
+    "expo-audio": "~57.0.5",
     "expo-auth-session": "~57.0.10",
     "expo-camera": "~57.0.4",
     "expo-constants": "~57.0.16",

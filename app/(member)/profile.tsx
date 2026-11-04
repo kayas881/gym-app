@@ -24,6 +24,7 @@ import Input from '../../components/ui/Input';
 import Button from '../../components/ui/Button';
 import Card from '../../components/ui/Card';
 import { KEYBOARD_AVOID_BEHAVIOR } from '../../constants/keyboard';
+import { useRestTimer } from '../../hooks/useRestTimer';
 
 const GENDER_OPTIONS = [
   { label: 'Male', value: 'male' },
@@ -52,6 +53,7 @@ export default function MemberProfileScreen() {
   const { profile, currentMembership, supabase, refreshProfile, signOut, userId } =
     useAppAuth();
   const { colors, isDark, toggleTheme, mode, setMode } = useTheme();
+  const rest = useRestTimer();
 
   // Form states
   const [fullName, setFullName] = useState(profile?.full_name || '');
@@ -534,6 +536,48 @@ export default function MemberProfileScreen() {
               thumbColor={isDark ? colors.primary : '#f4f3f4'}
             />
           </View>
+
+          <Text style={[styles.restTitle, { color: colors.text }]}>Rest timer</Text>
+          <Text style={[styles.themeSub, { color: colors.textTertiary }]}>
+            Suggested rests are gym-floor starting points, not medical advice.
+          </Text>
+          <View style={styles.themeToggleRow}>
+            <Text style={[styles.themeTitle, { color: colors.text }]}>Start after each set</Text>
+            <Switch
+              value={rest.prefs.autoStart}
+              onValueChange={(value) => void rest.updatePrefs({ autoStart: value })}
+              trackColor={{ false: '#767577', true: colors.primaryLight }}
+              thumbColor={rest.prefs.autoStart ? colors.primary : '#f4f3f4'}
+            />
+          </View>
+          <View style={styles.themeToggleRow}>
+            <Text style={[styles.themeTitle, { color: colors.text }]}>Sound when rest ends</Text>
+            <Switch
+              value={rest.prefs.audioAlert}
+              onValueChange={(value) => void rest.updatePrefs({ audioAlert: value })}
+              trackColor={{ false: '#767577', true: colors.primaryLight }}
+              thumbColor={rest.prefs.audioAlert ? colors.primary : '#f4f3f4'}
+            />
+          </View>
+          <View style={styles.themeToggleRow}>
+            <Text style={[styles.themeTitle, { color: colors.text }]}>Vibrate when rest ends</Text>
+            <Switch
+              value={rest.prefs.hapticAlert}
+              onValueChange={(value) => void rest.updatePrefs({ hapticAlert: value })}
+              trackColor={{ false: '#767577', true: colors.primaryLight }}
+              thumbColor={rest.prefs.hapticAlert ? colors.primary : '#f4f3f4'}
+            />
+          </View>
+          <View style={styles.restDefaultRow}>
+            <Text style={[styles.themeTitle, { color: colors.text }]}>
+              Default {rest.prefs.defaultSeconds}s
+            </Text>
+            <View style={styles.restDefaultBtns}>
+              <Button title="90" size="sm" variant="secondary" onPress={() => void rest.updatePrefs({ defaultSeconds: 90 })} />
+              <Button title="120" size="sm" variant="secondary" onPress={() => void rest.updatePrefs({ defaultSeconds: 120 })} />
+              <Button title="180" size="sm" variant="secondary" onPress={() => void rest.updatePrefs({ defaultSeconds: 180 })} />
+            </View>
+          </View>
         </Card>
 
         {/* Sign Out Button */}
@@ -673,6 +717,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    marginTop: 10,
   },
   themeInfo: {
     flexDirection: 'row',
@@ -688,6 +733,20 @@ const styles = StyleSheet.create({
   },
   themeSub: {
     fontSize: 12,
+  },
+  restTitle: {
+    fontSize: 15,
+    fontWeight: '700',
+    marginTop: 18,
+    marginBottom: 4,
+  },
+  restDefaultRow: {
+    marginTop: 10,
+    gap: 8,
+  },
+  restDefaultBtns: {
+    flexDirection: 'row',
+    gap: 8,
   },
   saveContainer: {
     position: 'absolute',
