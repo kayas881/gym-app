@@ -10,6 +10,10 @@
 </p>
 
 <p align="center">
+  <a href="https://github.com/kayas881/gym-app/actions/workflows/ci.yml"><img src="https://github.com/kayas881/gym-app/actions/workflows/ci.yml/badge.svg" alt="CI" /></a>
+</p>
+
+<p align="center">
   <a href="https://github.com/kayas881/gym-app/tree/hackathon/gymnos-in-session-copilot"><img alt="Hackathon branch" src="https://img.shields.io/badge/branch-hackathon%2Fgymnos--in--session--copilot-B7F34A?style=flat-square&labelColor=0A0C0B" /></a>
   <img alt="Expo SDK 57" src="https://img.shields.io/badge/Expo-SDK%2057-000?style=flat-square" />
   <img alt="React Native 0.86" src="https://img.shields.io/badge/React%20Native-0.86.3-61DAFB?style=flat-square&labelColor=0A0C0B" />
