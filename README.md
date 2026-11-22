@@ -1,5 +1,7 @@
 # Gymnos
 
+[![CI](https://github.com/kayas881/gym-app/actions/workflows/ci.yml/badge.svg)](https://github.com/kayas881/gym-app/actions/workflows/ci.yml)
+
 **Site:** [gymnos.tech](https://gymnos.tech)  
 **Demo:** [YouTube short](https://www.youtube.com/shorts/v1MzwtwfV60)
 
