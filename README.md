@@ -9,6 +9,43 @@ Gymnos is a gym-ops app for a small Indian gym that was running memberships off 
 
 Android builds go out as an APK from the site / GitHub Releases.
 
+## Voice workout logging
+
+Speak a set. Confirm it. Gymnos saves it once.
+
+A member on the floor taps the mic and says something like:
+
+> “Bench press, eighty kilos, eight reps, two RIR.”
+
+Meta Voice transcribes the clip. Meta Spark pulls out exercise, weight, reps, and RIR. A confirm card is the only write — Discard leaves the database untouched. Rest timer, personal records, and next-session suggestions then run on those saved rows.
+
+```mermaid
+flowchart LR
+  subgraph phone [On the phone]
+    A[Tap the mic] --> B[16 kHz PCM → WAV]
+    B --> C{Rest command?}
+    C -->|yes| D[Rest timer only]
+    C -->|no| E[Clerk session JWT]
+  end
+
+  subgraph edge [Supabase Edge — key stays here]
+    E --> F["Meta Voice<br/>transcribe"]
+    F --> G["Meta Spark<br/>extract set"]
+  end
+
+  subgraph save [Only after Confirm]
+    G --> H[Confirm card]
+    H -->|Discard| I[Nothing written]
+    H -->|Confirm| J[Local set + client_id]
+    J --> K[(workout_sessions / workout_sets)]
+  end
+```
+
+1. **Speak.** The phone records 16 kHz audio and turns it into a WAV on device. Short clips never leave the phone.
+2. **Understand.** Meta Voice transcribes. Gymnos then extracts exercise, weight, reps, and RIR. Rest commands (“skip rest”, “add 30 seconds”) stay on the timer.
+3. **Confirm.** A card shows the draft. Discard writes nothing. Confirm keeps the set on the phone first, even if gym wifi drops.
+4. **Save once.** One session per IST day. Each set has a unique `client_id`, so a retry cannot create a duplicate.
+
 ![gymnos.tech — product page and APK download](docs/screenshots/landing.png)
 
 ## Who uses it
@@ -39,10 +76,6 @@ Owner-created members can exist before they ever install the app. A claim code a
   <img src="docs/screenshots/attendance.png" alt="QR check-in" width="49%" />
   <img src="docs/screenshots/announcements.png" alt="Time-slot announcements" width="49%" />
 </p>
-
-## Voice workout logging
-
-A member on the floor taps the mic and says something like “bench press, eighty kilos, eight reps, two RIR.” Meta Voice transcribes the clip. Meta Spark extracts the set. A confirm card is the only write — Discard leaves the database untouched. Rest timer, personal records, and next-session suggestions then run on saved rows.
 
 ## Stack
 
