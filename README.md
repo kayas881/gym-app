@@ -28,6 +28,7 @@ Owner-created members can exist before they ever install the app. A claim code a
 - QR check-in and a live front-desk attendance count
 - Announcements aimed at morning or evening batches (so a night blast doesn’t wake the 6am crowd)
 - Complaints, staff chat, push notifications
+- Voice workout logging, rest timer, PRs, and next-session suggestions
 - IST dates end-to-end (`utils/date.ts`)
 
 <p>
@@ -39,13 +40,9 @@ Owner-created members can exist before they ever install the app. A claim code a
   <img src="docs/screenshots/announcements.png" alt="Time-slot announcements" width="49%" />
 </p>
 
-## Voice workout copilot
+## Voice workout logging
 
-On [`hackathon/gymnos-in-session-copilot`](https://github.com/kayas881/gym-app/tree/hackathon/gymnos-in-session-copilot) there is an in-session layer built for the Meta Global AI Developer Hackathon (26 Oct–4 Nov 2026).
-
-A member says something like “bench press, eighty kilos, eight reps, two RIR.” Meta Muse Voice transcribes it. Muse Spark extracts the set. A confirm card is the only thing that writes. Rest timer, PRs, and progression then run on saved rows, not on another model call.
-
-That work is documented on the branch. `main` here is the gym-ops app.
+A member on the floor taps the mic and says something like “bench press, eighty kilos, eight reps, two RIR.” Meta Voice transcribes the clip. Meta Spark extracts the set. A confirm card is the only write — Discard leaves the database untouched. Rest timer, personal records, and next-session suggestions then run on saved rows.
 
 ## Stack
 
