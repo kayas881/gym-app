@@ -17,6 +17,12 @@ Members log from the rack: tap the mic, say something like “bench press, eight
 
 ![How a set is logged — tap, transcribe, confirm, save once](docs/screenshots/how-a-set-is-logged.png)
 
+The clip is a WAV posted to a Supabase Edge Function (`POST /asr/transcribe`). Live PCM over WebSocket (`wss://api.meta.ai/v1/asr/realtime`) is designed and not in the app yet.
+
+### Meta Global AI Developer Hackathon
+
+This layer was built for the Meta Global AI Developer Hackathon (26 Oct–4 Nov 2026). The in-session work lives on [`hackathon/gymnos-in-session-copilot`](https://github.com/kayas881/gym-app/tree/hackathon/gymnos-in-session-copilot). Compare it to this branch: [`main...hackathon/gymnos-in-session-copilot`](https://github.com/kayas881/gym-app/compare/main...hackathon/gymnos-in-session-copilot).
+
 ## Who uses it
 
 | Role | What they do |
